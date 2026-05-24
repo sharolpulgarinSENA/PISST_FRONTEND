@@ -3,7 +3,9 @@ import { useState } from 'react'
 import logo from '../assets/imagenes/pisst_logo.png'
 
 export default function Login() {
-  const [showPass, setShowPass] = useState(false)
+    const [showPass, setShowPass] = useState(false)
+    const [form, setForm] = useState({ email: '', password: '' })
+    const [error, setError] = useState('')
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#0B0F19' }}>
@@ -11,57 +13,62 @@ export default function Login() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Columna izquierda ── */}
-        <div className="hidden lg:flex w-[55%] flex-col justify-between p-8 relative overflow-hidden"
-             style={{ backgroundColor: '#0B0F19' }}>
+        <div className="hidden lg:flex w-[55%] flex-col justify-between p-7 relative overflow-hidden"
+            style={{ backgroundColor: '#0B0F19' }}>
 
-          {/* Luz de fondo */}
-          <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full pointer-events-none"
-               style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)' }} />
+        {/* Luz de fondo */}
+        <div className="absolute top-1/3 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)' }} />
 
-          {/* Logo */}
-          <img src={logo} alt="PISST Logo"
-               style={{ height: '150px' }}
-               className="object-contain object-left mt-4" />
+        {/* Logo */}
+        <img src={logo} alt="PISST Logo"
+            style={{ height: '140px' }} // Reducido un toque para dar más aire limpio
+            className="object-contain object-left mt-2 z-10" />
 
-          {/* Texto principal */}
-          <div className="space-y-4 z-10">
+        {/* Contenedor Agrupado que sube el contenido (Ajustado con -mt-16 para alineación perfecta con el Login) */}
+        <div className="space-y-6 z-10 -mt-16 flex-1 flex flex-col justify-center">
+            
+            {/* Texto principal */}
+            <div className="space-y-4">
             <h1 className="text-white font-bold leading-tight" style={{ fontSize: '40px' }}>
-              Plataforma integral SST{' '}
-              <span style={{ color: '#6366F1' }}>Potenciadora de procesos</span>
+                Plataforma integral SST{' '}
+                <span style={{ color: '#6366F1' }}>Potenciadora de procesos</span>
             </h1>
-            <p className="text-sm leading-relaxed max-w-md" style={{ color: '#9CA3AF' }}>
-              PISST centraliza la gestión de procesos SG-SST en un solo lugar,
-              con herramientas seguras, intuitivas y diseñadas para equipos de
-              alto rendimiento.
+            {/* Se aumentó el interlineado a leading-loose y el texto a text-sm/tracking-wide */}
+            <p className="text-sm leading-loose tracking-wide max-w-md" style={{ color: '#9CA3AF' }}>
+                PISST centraliza la gestión de procesos SG-SST en un solo lugar,
+                con herramientas seguras, intuitivas y diseñadas para equipos de
+                alto rendimiento.
             </p>
+            </div>
 
             {/* Features */}
-            <div className="space-y-3">
-              {[
-                { icon: Shield,    titulo: 'Seguridad y privacidad',   desc: 'Protección de datos médicos con cifrado de extremo a extremo y cumplimiento normativo.' },
+            <div className="space-y-4 pt-2">
+            {[
+                { icon: Shield,   titulo: 'Seguridad y privacidad',   desc: 'Protección de datos médicos con cifrado de extremo a extremo y cumplimiento normativo.' },
                 { icon: BarChart2, titulo: 'Gestión inteligente',      desc: 'Automatiza procesos y optimiza recursos con análisis predictivo en tiempo real.' },
                 { icon: Users,     titulo: 'Colaboración sin límites', desc: 'Coordina equipos multidisciplinarios con comunicación fluida y acceso compartido.' },
-              ].map(({ icon: Icon, titulo, desc }) => (
-                <div key={titulo} className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
-                       style={{ backgroundColor: '#1A1F33' }}>
+            ].map(({ icon: Icon, titulo, desc }) => (
+                <div key={titulo} className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
+                    style={{ backgroundColor: '#1A1F33' }}>
                     <Icon size={17} style={{ color: '#6366F1' }} />
-                  </div>
-                  <div>
-                    <p className="text-white font-semibold text-sm">{titulo}</p>
-                    <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#9CA3AF' }}>{desc}</p>
-                  </div>
                 </div>
-              ))}
+                <div>
+                    <p className="text-white font-semibold text-sm">{titulo}</p>
+                    {/* Se mejoró el interlineado de las descripciones cortas */}
+                    <p className="text-xs mt-1 leading-relaxed tracking-wide" style={{ color: '#9CA3AF' }}>{desc}</p>
+                </div>
+                </div>
+            ))}
             </div>
-          </div>
-
-          {/* Frase */}
-          <p className="text-sm z-10 pt-4" style={{ color: '#6366F1' }}>
-            ❝ Tecnología que cuida, gestión que transforma.
-          </p>
         </div>
 
+        {/* Frase Fija Abajo */}
+        <p className="text-sm z-10 pt-4" style={{ color: '#6366F1' }}>
+            ❝ Tecnología que cuida, gestión que transforma.
+        </p>
+        </div>
         {/* ── Columna derecha ── */}
         <div className="w-full lg:w-[45%] flex flex-col justify-between p-6 lg:p-8"
              style={{ backgroundColor: '#0B0F19' }}>
@@ -92,8 +99,13 @@ export default function Login() {
               <div className="flex items-center gap-2 border rounded-lg px-3 py-2.5"
                    style={{ backgroundColor: '#1A1F33', borderColor: '#374151' }}>
                 <Mail size={15} style={{ color: '#9CA3AF' }} />
-                <input type="email" placeholder="tu@pisst.com"
-                       className="bg-transparent text-white text-sm outline-none w-full placeholder:text-[#9CA3AF]" />
+                <input
+                type="email"
+                placeholder="tu@pisst.com"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="bg-transparent text-white text-sm outline-none w-full placeholder:text-[#9CA3AF]"
+                />
               </div>
             </div>
 
@@ -103,13 +115,14 @@ export default function Login() {
               <div className="flex items-center gap-2 border rounded-lg px-3 py-2.5"
                    style={{ backgroundColor: '#1A1F33', borderColor: '#374151' }}>
                 <Lock size={15} style={{ color: '#9CA3AF' }} />
-                <input type={showPass ? 'text' : 'password'} placeholder="Tu contraseña"
-                       className="bg-transparent text-white text-sm outline-none w-full placeholder:text-[#9CA3AF]" />
-                <button onClick={() => setShowPass(v => !v)}>
-                  {showPass
-                    ? <EyeOff size={15} style={{ color: '#9CA3AF' }} />
-                    : <Eye    size={15} style={{ color: '#9CA3AF' }} />}
-                </button>
+                <input
+                type={showPass ? 'text' : 'password'}
+                placeholder="Tu contraseña"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                className="bg-transparent text-white text-sm outline-none w-full placeholder:text-[#9CA3AF]"
+                />
+
               </div>
             </div>
 
@@ -125,10 +138,26 @@ export default function Login() {
             </div>
 
             {/* Botón */}
-            <button className="w-full text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition"
-                    style={{ background: 'linear-gradient(to right, #A5B4FC, #8B94FF)' }}>
-              Iniciar sesión →
-            </button>
+            <button
+                onClick={() => {
+                    if (!form.email || !form.password) {
+                    setError('Por favor completa todos los campos')
+                    return
+                    }
+                    setError('')
+                    console.log('Datos listos para enviar:', form)
+                }}
+                className="w-full text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition"
+                style={{ background: 'linear-gradient(to right, #A5B4FC, #8B94FF)' }}
+                >
+                Iniciar sesión →
+                </button>
+                {/* en caso de error */}
+                {error && (
+                <p className="text-xs text-center" style={{ color: '#EF4444' }}>
+                    {error}
+                </p>
+                )}
 
             {/* Divider */}
             <div className="flex items-center gap-3">
