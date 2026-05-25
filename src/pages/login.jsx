@@ -1,11 +1,16 @@
 import { Mail, Lock, Eye, EyeOff, Shield, BarChart2, Users, Globe } from 'lucide-react'
 import { useState } from 'react'
 import logo from '../assets/imagenes/pisst_logo.png'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import api from '../services/api'
 
 export default function Login() {
     const [showPass, setShowPass] = useState(false)
     const [form, setForm] = useState({ email: '', password: '' })
     const [error, setError] = useState('')
+    const navigate = useNavigate()
+    const { login } = useAuth()
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#0B0F19' }}>
@@ -139,14 +144,34 @@ export default function Login() {
 
             {/* Botón */}
             <button
-                onClick={() => {
-                    if (!form.email || !form.password) {
-                    setError('Por favor completa todos los campos')
-                    return
-                    }
-                    setError('')
-                    console.log('Datos listos para enviar:', form)
-                }}
+               onClick={async () => {
+                if (!form.email || !form.password) {
+                  setError('Por favor completa todos los campos')
+                  return
+                }
+                setError('')
+               try {
+                  const response = await api.post('/auth/login', {
+                    email: form.email,
+                    password: form.password,
+                    recaptcha_token: 'test',
+                  })
+                  const { access_token, role, nombre } = response.data
+                  const normalizedRole = role?.toString?.().toLowerCase?.()
+                  login(access_token, { role: normalizedRole, nombre, email: form.email })
+                  if (normalizedRole === 'sst') navigate('/dashboard')
+                  else if (normalizedRole === 'gerencia') navigate('/dashboard')
+                  else navigate('/chat')
+                } catch (err) {
+                  const status  = err.response?.status
+                  const detalle = err.response?.data?.detail || 'Error al iniciar sesión'
+                  if (status === 429) {
+                    setError('Demasiados intentos. Intenta más tarde.')
+                  } else {
+                    setError(typeof detalle === 'string' ? detalle : 'Correo o contraseña incorrectos')
+                  }
+                }
+              }}
                 className="w-full text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition"
                 style={{ background: 'linear-gradient(to right, #A5B4FC, #8B94FF)' }}
                 >
