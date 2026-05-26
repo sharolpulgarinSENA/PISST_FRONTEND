@@ -143,7 +143,7 @@ export default function Sidebar({ isMobileOpen, onMobileClose }) {
         <button
             onClick={() => setCollapsed(v => !v)}
             className="flex items-center gap-2 w-full px-4 py-3 border-t text-sm transition hover:opacity-80"
-            style={{ color: '#9CA3AF', borderColor: '#1F2937' }}
+            style={{ color: '#9CA3A F', borderColor: '#1F2937' }}
         >
             {collapsed
             ? <ChevronRight size={16} className="mx-auto" />
