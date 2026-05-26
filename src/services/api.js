@@ -51,3 +51,18 @@ export const incidentesAPI = {
   crearAccion:     (id, data)      => api.post(`/incidentes/${id}/acciones`, data),
   descargarFurat:  (id)            => api.get(`/incidentes/${id}/furat`, { responseType: 'blob' }),
 }
+export const usuariosAPI = {
+  getAll:  ()           => api.get('/usuarios/'),
+  getById: (id)         => api.get(`/usuarios/${id}`),
+  create:  (data)       => api.post('/usuarios/', data),
+  update:  (id, data)   => api.patch(`/usuarios/${id}`, data),
+}
+export const riesgosAPI = {
+  getPeligros:    ()              => api.get('/riesgos/peligros'),
+  getPeligro:     (id)            => api.get(`/riesgos/peligros/${id}`),
+  crearPeligro:   (data)          => api.post('/riesgos/peligros', data),
+  evaluar:        (id, data)      => api.post(`/riesgos/peligros/${id}/evaluar`, data),
+  getMatriz:      ()              => api.get('/riesgos/matriz'),
+  crearControl:   (id, data)      => api.post(`/riesgos/peligros/${id}/controles`, data),
+  actualizarControl: (id, data)   => api.patch(`/riesgos/controles/${id}`, data),
+}

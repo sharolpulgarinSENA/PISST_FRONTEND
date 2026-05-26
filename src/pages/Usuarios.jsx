@@ -1,3 +1,394 @@
+import { useState, useEffect } from 'react'
+import { useOutletContext } from 'react-router-dom'
+import { Plus, X, UserCheck, UserX, Pencil } from 'lucide-react'
+import { usuariosAPI } from '../services/api'
+
+const ROLES = ['sst', 'gerencia', 'empleado']
+const ROL_COLOR = {
+  sst:      'bg-indigo-500/20 text-indigo-300',
+  gerencia: 'bg-purple-500/20 text-purple-300',
+  empleado: 'bg-green-500/20 text-green-300',
+}
+const ROL_LABEL = {
+  sst: 'Encargado SST', gerencia: 'Gerencia', empleado: 'Empleado'
+}
+
+function Badge({ text, colorClass }) {
+  return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${colorClass}`}>{text}</span>
+}
+
+/* ══════════════════════════════════════════
+   MODAL: NUEVO USUARIO
+══════════════════════════════════════════ */
+function ModalNuevoUsuario({ darkMode, onClose, onCreado }) {
+  const card   = darkMode ? '#111827' : '#FFFFFF'
+  const border = darkMode ? '#1F2937' : '#E5E7EB'
+  const text   = darkMode ? '#F9FAFB' : '#111827'
+  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const input  = darkMode ? '#1F2937' : '#F3F4F6'
+
+  const [form, setForm]     = useState({ nombre: '', email: '', role: '', area_nombre: '', cargo_nombre: '' })
+  const [errores, setErrores] = useState({})
+  const [banner, setBanner]   = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const validar = () => {
+    const e = {}
+    if (!form.nombre) e.nombre = true
+    if (!form.email)  e.email  = true
+    if (!form.role)   e.role   = true
+    setErrores(e)
+    return Object.keys(e).length === 0
+  }
+
+  const guardar = async () => {
+    if (!validar()) { setBanner('Por favor, diligencia todos los campos obligatorios para continuar.'); return }
+    setBanner('')
+    setLoading(true)
+    try {
+      await usuariosAPI.create({
+        nombre:       form.nombre,
+        email:        form.email,
+        role:         form.role,
+        area_nombre:  form.area_nombre  || undefined,
+        cargo_nombre: form.cargo_nombre || undefined,
+      })
+      onCreado()
+      onClose()
+    } catch (err) {
+      setBanner(err.response?.data?.detail || 'Error al crear el usuario.')
+    } finally { setLoading(false) }
+  }
+
+  const inputClass = (k) =>
+    `w-full rounded-lg px-3 py-2.5 text-sm outline-none border ${errores[k] ? 'border-red-500' : 'border-transparent'}`
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+         style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl"
+           style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
+          <h2 className="font-bold text-lg" style={{ color: text }}>Nuevo Usuario</h2>
+          <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {banner && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+              {banner}
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Nombre completo *</label>
+            <input type="text" placeholder="Nombre del usuario" value={form.nombre}
+                   onChange={e => set('nombre', e.target.value)}
+                   className={inputClass('nombre')} style={{ backgroundColor: input, color: text }} />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Correo electrónico *</label>
+            <input type="email" placeholder="correo@empresa.com" value={form.email}
+                   onChange={e => set('email', e.target.value)}
+                   className={inputClass('email')} style={{ backgroundColor: input, color: text }} />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Rol *</label>
+            <select value={form.role} onChange={e => set('role', e.target.value)}
+                    className={inputClass('role')} style={{ backgroundColor: input, color: text }}>
+              <option value="">Seleccionar rol...</option>
+              {ROLES.map(r => <option key={r} value={r}>{ROL_LABEL[r]}</option>)}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Área</label>
+              <input type="text" placeholder="Ej: Producción" value={form.area_nombre}
+                     onChange={e => set('area_nombre', e.target.value)}
+                     className={inputClass('area_nombre')} style={{ backgroundColor: input, color: text }} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Cargo</label>
+              <input type="text" placeholder="Ej: Operario" value={form.cargo_nombre}
+                     onChange={e => set('cargo_nombre', e.target.value)}
+                     className={inputClass('cargo_nombre')} style={{ backgroundColor: input, color: text }} />
+            </div>
+          </div>
+
+          <div className="rounded-lg px-4 py-3 text-xs" style={{ backgroundColor: input, color: sub }}>
+            ℹ️ Se enviará una contraseña temporal al correo del usuario.
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: border }}>
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg" style={{ color: sub }}>
+            Cancelar
+          </button>
+          <button onClick={guardar} disabled={loading}
+                  className="px-5 py-2 text-sm font-semibold rounded-lg text-white disabled:opacity-50"
+                  style={{ backgroundColor: '#6366F1' }}>
+            {loading ? 'Creando...' : 'Crear usuario'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════
+   MODAL: EDITAR USUARIO
+══════════════════════════════════════════ */
+function ModalEditarUsuario({ darkMode, usuario, onClose, onActualizado }) {
+  const card   = darkMode ? '#111827' : '#FFFFFF'
+  const border = darkMode ? '#1F2937' : '#E5E7EB'
+  const text   = darkMode ? '#F9FAFB' : '#111827'
+  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const input  = darkMode ? '#1F2937' : '#F3F4F6'
+
+  const [form, setForm]     = useState({ nombre: usuario.nombre, activo: usuario.activo })
+  const [banner, setBanner] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const guardar = async () => {
+    setLoading(true)
+    try {
+      await usuariosAPI.update(usuario.id, { nombre: form.nombre, activo: form.activo })
+      onActualizado()
+      onClose()
+    } catch (err) {
+      setBanner(err.response?.data?.detail || 'Error al actualizar el usuario.')
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+         style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+      <div className="w-full max-w-sm rounded-2xl shadow-2xl"
+           style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
+          <h2 className="font-bold text-lg" style={{ color: text }}>Editar Usuario</h2>
+          <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {banner && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+              {banner}
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Nombre</label>
+            <input type="text" value={form.nombre} onChange={e => set('nombre', e.target.value)}
+                   className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                   style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }} />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm" style={{ color: text }}>Usuario activo</span>
+            <button onClick={() => set('activo', !form.activo)}
+                    className="w-12 h-6 rounded-full transition-colors relative"
+                    style={{ backgroundColor: form.activo ? '#6366F1' : '#374151' }}>
+              <div className="w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all"
+                   style={{ left: form.activo ? '26px' : '2px' }} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: border }}>
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg" style={{ color: sub }}>
+            Cancelar
+          </button>
+          <button onClick={guardar} disabled={loading}
+                  className="px-5 py-2 text-sm font-semibold rounded-lg text-white disabled:opacity-50"
+                  style={{ backgroundColor: '#6366F1' }}>
+            {loading ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════
+   PÁGINA PRINCIPAL
+══════════════════════════════════════════ */
 export default function Usuarios() {
-  return <div className="p-6 text-white">Usuarios — próximamente</div>
+  const { darkMode } = useOutletContext()
+  const bg     = darkMode ? '#0B0F19' : '#F9FAFB'
+  const card   = darkMode ? '#111827' : '#FFFFFF'
+  const border = darkMode ? '#1F2937' : '#E5E7EB'
+  const text   = darkMode ? '#F9FAFB' : '#111827'
+  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+
+  const [usuarios, setUsuarios]       = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [modalNuevo, setModalNuevo]   = useState(false)
+  const [modalEditar, setModalEditar] = useState(null)
+  const [filtro, setFiltro]           = useState('todos')
+
+  const cargarUsuarios = () => {
+    setLoading(true)
+    usuariosAPI.getAll()
+      .then(r => setUsuarios(r.data))
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { cargarUsuarios() }, [])
+
+  const usuariosFiltrados = filtro === 'todos'
+    ? usuarios
+    : filtro === 'activos'
+      ? usuarios.filter(u => u.activo)
+      : usuarios.filter(u => !u.activo)
+
+  return (
+    <div className="min-h-full px-4 sm:px-6 lg:px-8 py-6" style={{ backgroundColor: bg }}>
+
+      {/* Encabezado */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: text }}>Usuarios</h1>
+          <p className="text-sm mt-0.5" style={{ color: sub }}>
+            {usuarios.length} {usuarios.length === 1 ? 'usuario registrado' : 'usuarios registrados'}
+          </p>
+        </div>
+        <button onClick={() => setModalNuevo(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white"
+                style={{ backgroundColor: '#6366F1' }}>
+          <Plus size={16} /> Nuevo Usuario
+        </button>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex gap-2 mb-6">
+        {['todos', 'activos', 'inactivos'].map(f => (
+          <button key={f} onClick={() => setFiltro(f)}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium capitalize transition"
+                  style={{
+                    backgroundColor: filtro === f ? '#6366F1' : card,
+                    color: filtro === f ? '#fff' : sub,
+                    border: `1px solid ${filtro === f ? '#6366F1' : border}`
+                  }}>
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {/* Tabla */}
+      {/* Vista tabla — desktop */}
+{loading ? (
+  <p className="text-center py-12 text-sm" style={{ color: sub }}>Cargando usuarios...</p>
+) : (
+  <>
+    {/* TABLA — solo desktop */}
+    <div className="hidden md:block rounded-xl overflow-hidden" style={{ border: `1px solid ${border}` }}>
+      <table className="w-full text-sm">
+        <thead>
+          <tr style={{ backgroundColor: darkMode ? '#1F2937' : '#F9FAFB' }}>
+            {['Usuario', 'Correo', 'Rol', 'Estado', 'Acciones'].map(h => (
+              <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: sub }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {usuariosFiltrados.map((u, i) => (
+            <tr key={u.id}
+                style={{ backgroundColor: i % 2 === 0 ? card : darkMode ? '#0F1923' : '#F9FAFB',
+                         borderTop: `1px solid ${border}` }}>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                       style={{ backgroundColor: '#6366F1' }}>
+                    {u.nombre?.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="font-medium" style={{ color: text }}>{u.nombre}</span>
+                </div>
+              </td>
+              <td className="px-4 py-3" style={{ color: sub }}>{u.email}</td>
+              <td className="px-4 py-3">
+                <Badge text={ROL_LABEL[u.role] || u.role} colorClass={ROL_COLOR[u.role] || 'bg-gray-500/20 text-gray-300'} />
+              </td>
+              <td className="px-4 py-3">
+                {u.activo
+                  ? <span className="flex items-center gap-1.5 text-xs text-green-400"><UserCheck size={14} /> Activo</span>
+                  : <span className="flex items-center gap-1.5 text-xs text-red-400"><UserX size={14} /> Inactivo</span>
+                }
+              </td>
+              <td className="px-4 py-3">
+                <button onClick={() => setModalEditar(u)}
+                        className="p-1.5 rounded-lg transition hover:opacity-80"
+                        style={{ backgroundColor: darkMode ? '#1F2937' : '#F3F4F6' }}>
+                  <Pencil size={14} style={{ color: '#6366F1' }} />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {usuariosFiltrados.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-sm" style={{ color: sub }}>No hay usuarios en este filtro.</p>
+        </div>
+      )}
+    </div>
+
+    {/* CARDS — solo móvil */}
+    <div className="md:hidden space-y-3">
+      {usuariosFiltrados.length === 0 && (
+        <p className="text-center py-12 text-sm" style={{ color: sub }}>No hay usuarios en este filtro.</p>
+      )}
+      {usuariosFiltrados.map(u => (
+        <div key={u.id} className="rounded-xl p-4 space-y-3"
+             style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                   style={{ backgroundColor: '#6366F1' }}>
+                {u.nombre?.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="font-semibold text-sm" style={{ color: text }}>{u.nombre}</p>
+                <p className="text-xs" style={{ color: sub }}>{u.email}</p>
+              </div>
+            </div>
+            <button onClick={() => setModalEditar(u)}
+                    className="p-2 rounded-lg"
+                    style={{ backgroundColor: darkMode ? '#1F2937' : '#F3F4F6' }}>
+              <Pencil size={14} style={{ color: '#6366F1' }} />
+            </button>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge text={ROL_LABEL[u.role] || u.role} colorClass={ROL_COLOR[u.role] || 'bg-gray-500/20 text-gray-300'} />
+            {u.activo
+              ? <span className="flex items-center gap-1 text-xs text-green-400"><UserCheck size={13} /> Activo</span>
+              : <span className="flex items-center gap-1 text-xs text-red-400"><UserX size={13} /> Inactivo</span>
+            }
+          </div>
+        </div>
+      ))}
+    </div>
+  </>
+)}
+
+      {modalNuevo && (
+        <ModalNuevoUsuario darkMode={darkMode} onClose={() => setModalNuevo(false)} onCreado={cargarUsuarios} />
+      )}
+      {modalEditar && (
+        <ModalEditarUsuario darkMode={darkMode} usuario={modalEditar}
+                            onClose={() => setModalEditar(null)} onActualizado={cargarUsuarios} />
+      )}
+    </div>
+  )
 }
