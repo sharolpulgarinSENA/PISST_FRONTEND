@@ -66,3 +66,28 @@ export const riesgosAPI = {
   crearControl:   (id, data)      => api.post(`/riesgos/peligros/${id}/controles`, data),
   actualizarControl: (id, data)   => api.patch(`/riesgos/controles/${id}`, data),
 }
+
+export const capacitacionesAPI = {
+  getAll:              ()              => api.get('/capacitaciones/'),
+  crear:               (data)          => api.post('/capacitaciones/', data),
+  getCobertura:        ()              => api.get('/capacitaciones/cobertura'),
+  getSesiones:         (id)            => api.get(`/capacitaciones/${id}/sesiones`),
+  crearSesion:         (data)          => api.post('/capacitaciones/sesiones', data),
+  registrarAsistencia: (data)          => api.post('/capacitaciones/asistencia', data),
+  getAsistencia:       (sesionId)      => api.get(`/capacitaciones/sesiones/${sesionId}/asistencia`),
+  crearEvaluacion:     (data)          => api.post('/capacitaciones/evaluaciones', data),
+  responderEvaluacion: (data)          => api.post('/capacitaciones/evaluaciones/responder', data),
+  getCertificado:      (evalId, empId) =>
+    api.get(`/capacitaciones/evaluaciones/${evalId}/certificado/${empId}`, { responseType: 'blob' }),
+}
+
+export const auditoriasAPI = {
+  getAll:         ()              => api.get('/auditorias/'),
+  crear:          (data)          => api.post('/auditorias/', data),
+  cambiarEstado:  (id, estado)    => api.patch(`/auditorias/${id}/estado?estado=${estado}`),
+  getProgreso:    (id)            => api.get(`/auditorias/${id}/progreso`),
+  getHallazgos:   (id)            => api.get(`/auditorias/${id}/hallazgos`),
+  crearHallazgo:  (id, data)      => api.post(`/auditorias/${id}/hallazgos`, data),
+  crearNC:        (hallazgoId, data) => api.post(`/auditorias/hallazgos/${hallazgoId}/nc`, data),
+  actualizarNC:   (ncId, data)    => api.patch(`/auditorias/nc/${ncId}`, data),
+}
