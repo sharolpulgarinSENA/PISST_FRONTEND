@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { Plus, X, Download, AlertTriangle } from 'lucide-react'
 import { incidentesAPI } from '../services/api'
 
@@ -437,6 +437,14 @@ export default function Incidentes() {
   const [loading, setLoading]           = useState(true)
   const [modalNuevo, setModalNuevo]     = useState(false)
   const [modalDetalle, setModalDetalle] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+useEffect(() => {
+  if (searchParams.get('nuevo') === 'true') {
+    setModalNuevo(true)
+    setSearchParams({})
+  }
+}, [searchParams])
 
   const cargarReportes = () => {
     setLoading(true)

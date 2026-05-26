@@ -7,7 +7,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburgerClick, onMenu
   const [dropdown, setDropdown] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
 
   return (
     <div
@@ -97,10 +97,16 @@ export default function Navbar({ darkMode, setDarkMode, onHamburgerClick, onMenu
       </div>
 
       {/* ============ CENTRO: Acciones rápidas (solo desktop) ============ */}
-      <div className="hidden lg:flex items-center gap-2">
-        {['Nuevo reporte', 'Capacitaciones', 'Evaluación de Riesgos', 'Auditorías'].map((item) => (
+      <div className="hidden md:flex items-center gap-2">
+        {[
+          { label: 'Nuevo reporte',        path: '/incidentes?nuevo=true' },
+          { label: 'Capacitaciones',       path: '/capacitaciones' },
+          { label: 'Evaluación de Riesgos',path: '/riesgos' },
+          { label: 'Auditorías',           path: '/auditorias' },
+        ].map(({ label, path }) => (
           <button
-            key={item}
+            key={label}
+            onClick={() => navigate(path)}
             className="text-xs px-3 py-1.5 rounded-lg font-medium transition hover:opacity-80"
             style={{
               backgroundColor: darkMode ? '#1A1F33' : '#F3F4F6',
@@ -108,7 +114,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburgerClick, onMenu
               border: `1px solid ${darkMode ? '#1F2937' : '#E5E7EB'}`
             }}
           >
-            {item}
+            {label}
           </button>
         ))}
       </div>
@@ -177,17 +183,14 @@ export default function Navbar({ darkMode, setDarkMode, onHamburgerClick, onMenu
               className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
               style={{ backgroundColor: '#6366F1' }}
             >
-              CR
+              {user?.nombre?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div className="text-left">
-              <p
-                className="text-sm font-semibold"
-                style={{ color: darkMode ? '#E5E7EB' : '#111827' }}
-              >
-                Carlos Ramírez
+              <p className="text-sm font-semibold" style={{ color: darkMode ? '#E5E7EB' : '#111827' }}>
+                {user?.nombre || 'Usuario'}
               </p>
-              <p className="text-xs" style={{ color: '#9CA3AF' }}>
-                Coordinador SST
+              <p className="text-xs capitalize" style={{ color: '#9CA3AF' }}>
+                {user?.role || ''}
               </p>
             </div>
             <ChevronDown size={14} style={{ color: '#9CA3AF' }} />
