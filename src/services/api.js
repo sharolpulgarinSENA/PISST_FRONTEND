@@ -1,0 +1,93 @@
+// src/services/api.js
+// Instancia de axios configurada para llamar al backend
+// El interceptor agrega el token JWT automáticamente en cada petición
+import axios from "axios";
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
+});
+
+// Interceptor: antes de cada petición agrega el token si existe
+api.interceptors.request.use((config) => {
+  const token = sessionStorage.getItem("pisst_token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Interceptor: si el backend responde 401 en rutas protegidas, limpiar sesión y redirigir
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const esRutaLogin = error.config?.url?.includes("/auth/login");
+    if (error.response?.status === 401 && !esRutaLogin) {
+      const detalle = error.response?.data?.detail || "";
+      sessionStorage.removeItem("pisst_token");
+      sessionStorage.removeItem("pisst_user");
+      const motivo = detalle.toLowerCase().includes("dispositivo")
+        ? "dispositivo"
+        : "expirada";
+      window.location.href = `/login?sesion=${motivo}`;
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+export const metricasAPI = {
+//   getDashboard: () => api.get('/metricas/dashboard'),
+  getKpis:      () => api.get('/metricas/kpis'),
+  getDashboard: () => api.get('/metricas/dashboard-gerencia'),
+  getAlertas:   () => api.get('/metricas/alertas'),
+}
+export const incidentesAPI = {
+  getAll:          ()              => api.get('/incidentes/'),
+  getById:         (id)            => api.get(`/incidentes/${id}`),
+  create:          (data)          => api.post('/incidentes/', data),
+  cambiarEstado:   (id, estado)    => api.patch(`/incidentes/${id}/estado`, { estado }),
+  getProgreso:     (id)            => api.get(`/incidentes/${id}/progreso`),
+  crearInvestigacion: (id, data)   => api.post(`/incidentes/${id}/investigacion`, data),
+  crearAccion:     (id, data)      => api.post(`/incidentes/${id}/acciones`, data),
+  descargarFurat:  (id)            => api.get(`/incidentes/${id}/furat`, { responseType: 'blob' }),
+}
+export const usuariosAPI = {
+  getAll:  ()           => api.get('/usuarios/'),
+  getById: (id)         => api.get(`/usuarios/${id}`),
+  create:  (data)       => api.post('/usuarios/', data),
+  update:  (id, data)   => api.patch(`/usuarios/${id}`, data),
+}
+export const riesgosAPI = {
+  getPeligros:    ()              => api.get('/riesgos/peligros'),
+  getPeligro:     (id)            => api.get(`/riesgos/peligros/${id}`),
+  crearPeligro:   (data)          => api.post('/riesgos/peligros', data),
+  evaluar:        (id, data)      => api.post(`/riesgos/peligros/${id}/evaluar`, data),
+  getMatriz:      ()              => api.get('/riesgos/matriz'),
+  crearControl:   (id, data)      => api.post(`/riesgos/peligros/${id}/controles`, data),
+  actualizarControl: (id, data)   => api.patch(`/riesgos/controles/${id}`, data),
+}
+
+export const capacitacionesAPI = {
+  getAll:              ()              => api.get('/capacitaciones/'),
+  crear:               (data)          => api.post('/capacitaciones/', data),
+  getCobertura:        ()              => api.get('/capacitaciones/cobertura'),
+  getSesiones:         (id)            => api.get(`/capacitaciones/${id}/sesiones`),
+  crearSesion:         (data)          => api.post('/capacitaciones/sesiones', data),
+  registrarAsistencia: (data)          => api.post('/capacitaciones/asistencia', data),
+  getAsistencia:       (sesionId)      => api.get(`/capacitaciones/sesiones/${sesionId}/asistencia`),
+  crearEvaluacion:     (data)          => api.post('/capacitaciones/evaluaciones', data),
+  responderEvaluacion: (data)          => api.post('/capacitaciones/evaluaciones/responder', data),
+  getCertificado:      (evalId, empId) =>
+    api.get(`/capacitaciones/evaluaciones/${evalId}/certificado/${empId}`, { responseType: 'blob' }),
+}
+
+export const auditoriasAPI = {
+  getAll:         ()              => api.get('/auditorias/'),
+  crear:          (data)          => api.post('/auditorias/', data),
+  cambiarEstado:  (id, estado)    => api.patch(`/auditorias/${id}/estado?estado=${estado}`),
+  getProgreso:    (id)            => api.get(`/auditorias/${id}/progreso`),
+  getHallazgos:   (id)            => api.get(`/auditorias/${id}/hallazgos`),
+  crearHallazgo:  (id, data)      => api.post(`/auditorias/${id}/hallazgos`, data),
+  crearNC:        (hallazgoId, data) => api.post(`/auditorias/hallazgos/${hallazgoId}/nc`, data),
+  actualizarNC:   (ncId, data)    => api.patch(`/auditorias/nc/${ncId}`, data),
+}

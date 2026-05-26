@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { Search, Moon, Sun, Bell, ChevronDown, User, Settings, LogOut, Menu, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 
-export default function Navbar({ darkMode, setDarkMode, onHamburgerClick }) {
+export default function Navbar({ darkMode, setDarkMode, onHamburgerClick, onMenuClick }) {
   const [dropdown, setDropdown] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
 
   return (
     <div
@@ -15,14 +19,15 @@ export default function Navbar({ darkMode, setDarkMode, onHamburgerClick }) {
     >
       {/* ============ IZQUIERDA: hamburguesa + búsqueda ============ */}
       <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-        {/* Botón hamburguesa — solo mobile/tablet */}
+        {/* Botón hamburguesa — solo móvil */}
         <button
-          onClick={onHamburgerClick}
-          className="lg:hidden p-2 -ml-1 rounded-lg transition hover:opacity-80 shrink-0"
-          style={{ color: darkMode ? '#E5E7EB' : '#374151' }}
-          aria-label="Abrir menú"
+          onClick={onMenuClick}
+          className="lg:hidden mr-3"
+          style={{ color: darkMode ? '#9CA3AF' : '#6B7280' }}
         >
-          <Menu size={22} />
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
         </button>
 
         {/* 🔍 BÚSQUEDA — Versión MOBILE: solo icono que despliega input */}
@@ -92,10 +97,16 @@ export default function Navbar({ darkMode, setDarkMode, onHamburgerClick }) {
       </div>
 
       {/* ============ CENTRO: Acciones rápidas (solo desktop) ============ */}
-      <div className="hidden lg:flex items-center gap-2">
-        {['Nuevo reporte', 'Capacitaciones', 'Evaluación de Riesgos', 'Auditorías'].map((item) => (
+      <div className="hidden md:flex items-center gap-2">
+        {[
+          { label: 'Nuevo reporte',        path: '/incidentes?nuevo=true' },
+          { label: 'Capacitaciones',       path: '/capacitaciones' },
+          { label: 'Evaluación de Riesgos',path: '/riesgos' },
+          { label: 'Auditorías',           path: '/auditorias' },
+        ].map(({ label, path }) => (
           <button
-            key={item}
+            key={label}
+            onClick={() => navigate(path)}
             className="text-xs px-3 py-1.5 rounded-lg font-medium transition hover:opacity-80"
             style={{
               backgroundColor: darkMode ? '#1A1F33' : '#F3F4F6',
@@ -103,7 +114,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburgerClick }) {
               border: `1px solid ${darkMode ? '#1F2937' : '#E5E7EB'}`
             }}
           >
-            {item}
+            {label}
           </button>
         ))}
       </div>
@@ -172,17 +183,14 @@ export default function Navbar({ darkMode, setDarkMode, onHamburgerClick }) {
               className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
               style={{ backgroundColor: '#6366F1' }}
             >
-              CR
+              {user?.nombre?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div className="text-left">
-              <p
-                className="text-sm font-semibold"
-                style={{ color: darkMode ? '#E5E7EB' : '#111827' }}
-              >
-                Carlos Ramírez
+              <p className="text-sm font-semibold" style={{ color: darkMode ? '#E5E7EB' : '#111827' }}>
+                {user?.nombre || 'Usuario'}
               </p>
-              <p className="text-xs" style={{ color: '#9CA3AF' }}>
-                Coordinador SST
+              <p className="text-xs capitalize" style={{ color: '#9CA3AF' }}>
+                {user?.role || ''}
               </p>
             </div>
             <ChevronDown size={14} style={{ color: '#9CA3AF' }} />
@@ -214,6 +222,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburgerClick }) {
                 style={{ borderColor: darkMode ? '#1F2937' : '#E5E7EB' }}
               />
               <button
+                onClick={() => { logout(); navigate('/login') }}
                 className="flex items-center gap-3 w-full px-4 py-2.5 text-sm"
                 style={{ color: '#EF4444' }}
               >

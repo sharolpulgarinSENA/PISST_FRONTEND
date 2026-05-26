@@ -1,69 +1,98 @@
-import { useState } from 'react'
-import { BrowserRouter } from 'react-router-dom'
-import Sidebar from './components/layout/Sidebar'
-import Navbar from './components/layout/Navbar'
-import MobileBottomNav from './components/layout/MobileBottomNav'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
+import Layout from './components/Layout'
+import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import Chat from './pages/Chat'
+import Incidentes from './pages/Incidentes'
+import Capacitaciones from './pages/Capacitaciones'
+import Riesgos from './pages/Riesgos'
+import Auditorias from './pages/Auditorias'
+import Usuarios from './pages/Usuarios'
+import ResetPassword from './pages/ResetPassword'
+
+
+function PrivateRoute({ children, roles }) {
+  const { token, user } = useAuth()
+  if (!token) return <Navigate to="/login" replace />
+  const userRole = user?.role?.toString?.().toLowerCase?.()
+  if (roles && !roles.map(r => r.toString().toLowerCase()).includes(userRole)) return <Navigate to="/login" replace />
+  return children
+}
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(true)
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const { user } = useAuth()
+
+  const userRole = user?.role?.toString?.().toLowerCase?.()
 
   return (
-    <BrowserRouter>
-      <div
-        className="h-screen overflow-hidden"
-        style={{ backgroundColor: darkMode ? '#0B0F19' : '#F9FAFB' }}
-      >
-        {/* ============ OVERLAY DEL DRAWER (solo mobile) ============ */}
-        {mobileDrawerOpen && (
-          <div
-            className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-            onClick={() => setMobileDrawerOpen(false)}
-          />
-        )}
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
-        <div className="flex h-full">
-          {/* ============ SIDEBAR ============
-              - Mobile (<lg): drawer flotante con translate-x
-              - Desktop (>=lg): visible permanente en flujo normal
-          */}
-          <aside
-            className={`
-              fixed lg:static inset-y-0 left-0 z-50
-              transition-transform duration-300 ease-in-out
-              ${mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'}
-              lg:translate-x-0
-            `}
-          >
-            <Sidebar
-              darkMode={darkMode}
-              isMobileOpen={mobileDrawerOpen}
-              onMobileClose={() => setMobileDrawerOpen(false)}
-            />
-          </aside>
+      <Route path="/" element={
+        <PrivateRoute>
+          {userRole === 'sst'      ? <Navigate to="/dashboard" replace /> :
+           userRole === 'gerencia' ? <Navigate to="/dashboard" replace /> :
+           userRole === 'empleado' ? <Navigate to="/chat" replace /> :
+           <Navigate to="/login" replace />}
+        </PrivateRoute>
+      }/>
 
-          {/* ============ COLUMNA PRINCIPAL ============ */}
-          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-            <Navbar
-              darkMode={darkMode}
-              setDarkMode={setDarkMode}
-              onHamburgerClick={() => setMobileDrawerOpen(true)}
-            />
+      {/* Todas las páginas protegidas usan el Layout */}
+      <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
+        <Route path="/dashboard"      element={<PrivateRoute roles={['sst','gerencia']}><Dashboard /></PrivateRoute>} />
+        <Route path="/chat"           element={<PrivateRoute><Chat /></PrivateRoute>} />
+        <Route path="/incidentes"     element={<PrivateRoute><Incidentes /></PrivateRoute>} />
+        <Route path="/capacitaciones" element={<PrivateRoute roles={['sst']}><Capacitaciones /></PrivateRoute>} />
+        <Route path="/riesgos"        element={<PrivateRoute roles={['sst']}><Riesgos /></PrivateRoute>} />
+        <Route path="/auditorias"     element={<PrivateRoute roles={['sst']}><Auditorias /></PrivateRoute>} />
+        <Route path="/usuarios"       element={<PrivateRoute roles={['sst']}><Usuarios /></PrivateRoute>} />
+      </Route>
 
-            {/* El Dashboard ya maneja su propio scroll y padding interno */}
-            <Dashboard darkMode={darkMode} />
-          </div>
-        </div>
+      <Route path="/dashboard" element={
+        <PrivateRoute roles={['sst', 'gerencia']}>
+          <Dashboard />
+        </PrivateRoute>
+      }/>
 
-        {/* ============ BOTTOM NAV (solo mobile) ============ */}
-        <MobileBottomNav
-          darkMode={darkMode}
-          active={activeTab}
-          onChange={setActiveTab}
-        />
-      </div>
-    </BrowserRouter>
+      <Route path="/chat" element={
+        <PrivateRoute>
+          <Chat />
+        </PrivateRoute>
+      }/>
+
+      <Route path="/incidentes" element={
+       <PrivateRoute>
+         <Incidentes />
+       </PrivateRoute>
+      }/>
+
+      <Route path="/capacitaciones" element={
+        <PrivateRoute roles={['sst']}>
+          <Capacitaciones />
+        </PrivateRoute>
+      }/>
+
+      <Route path="/riesgos" element={
+        <PrivateRoute roles={['sst']}>
+          <Riesgos />
+        </PrivateRoute>
+      }/>
+
+      <Route path="/auditorias" element={
+        <PrivateRoute roles={['sst']}>
+          <Auditorias />
+        </PrivateRoute>
+      }/>
+
+      <Route path="/usuarios" element={
+        <PrivateRoute roles={['sst']}>
+          <Usuarios />
+        </PrivateRoute>
+      }/>
+
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   )
 }
