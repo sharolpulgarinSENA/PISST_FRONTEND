@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
-import Login from './pages/Login'
+import Login from './pages/login'
 import Dashboard from './pages/Dashboard'
 import Chat from './pages/Chat'
 import Incidentes from './pages/Incidentes'
