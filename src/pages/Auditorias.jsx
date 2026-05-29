@@ -114,6 +114,7 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
   const [progreso, setProgreso]   = useState(null)
   const [banner, setBanner]       = useState('')
   const [loading, setLoading]     = useState(false)
+  const [estadoActual, setEstadoActual] = useState(auditoria.estado)  // ← aquí
 
   const [hallazgoForm, setHallazgoForm] = useState({
     descripcion: '', clasificacion: '', evidencia: '', recomendacion: ''
@@ -132,6 +133,7 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
   const cambiarEstado = async (estado) => {
     try {
       await auditoriasAPI.cambiarEstado(auditoria.id, estado)
+      setEstadoActual(estado)   // ← actualiza visualmente el modal al instante
       onActualizada()
       setBanner('')
     } catch (err) {
@@ -228,8 +230,8 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
                 </div>
                 <div className="rounded-lg p-3" style={{ backgroundColor: input }}>
                   <p className="text-xs mb-1" style={{ color: sub }}>Estado actual</p>
-                  <Badge text={ESTADO_LABEL[auditoria.estado] || auditoria.estado}
-                         colorClass={ESTADO_COLOR[auditoria.estado] || 'bg-gray-500/20 text-gray-300'} />
+                  <Badge text={ESTADO_LABEL[estadoActual] || estadoActual}
+                         colorClass={ESTADO_COLOR[estadoActual] || 'bg-gray-500/20 text-gray-300'} />
                 </div>
               </div>
 
@@ -252,8 +254,8 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
                     <button key={e} onClick={() => cambiarEstado(e)}
                             className="text-xs px-3 py-1.5 rounded-lg font-medium transition hover:opacity-80"
                             style={{
-                              backgroundColor: auditoria.estado === e ? '#6366F1' : input,
-                              color: auditoria.estado === e ? '#fff' : text,
+                              backgroundColor: estadoActual === e ? '#6366F1' : input,
+                              color: estadoActual === e ? '#fff' : text,
                               border: `1px solid ${border}`
                             }}>
                       {ESTADO_LABEL[e]}
@@ -367,7 +369,7 @@ export default function Auditorias() {
   const [loading, setLoading]           = useState(true)
   const [modalNuevo, setModalNuevo]     = useState(false)
   const [modalDetalle, setModalDetalle] = useState(null)
-
+  
   const cargar = () => {
     setLoading(true)
     auditoriasAPI.getAll()
