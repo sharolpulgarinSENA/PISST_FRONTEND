@@ -106,7 +106,6 @@ export const metricasAPI = {
   getKpis:      ()              => api.get("/metricas/kpis"),
   getDashboard: ()              => api.get("/metricas/dashboard-gerencia"),
   getAlertas:   ()              => api.get("/metricas/alertas"),
-  // Sprint 4: período solo puede ser mensual | trimestral | anual
   getReportePdf:   (periodo)   => api.get("/metricas/reporte-pdf",   { params: { periodo }, responseType: "blob" }),
   getReporteExcel: (periodo)   => api.get("/metricas/reporte-excel", { params: { periodo }, responseType: "blob" }),
 };
@@ -127,7 +126,7 @@ export const incidentesAPI = {
 export const usuariosAPI = {
   getAll:  (skip = 0, limit = 50) => api.get("/usuarios/", { params: { skip, limit } }),
   getById: (id)                   => api.get(`/usuarios/${id}`),
-  create:  (data)                 => api.post("/usuarios/", data),   // SST usa /usuarios/, NO /auth/register
+  create:  (data)                 => api.post("/usuarios/", data),
   update:  (id, data)             => api.patch(`/usuarios/${id}`, data),
 };
 
@@ -142,18 +141,35 @@ export const riesgosAPI = {
   actualizarControl: (id, data)             => api.patch(`/riesgos/controles/${id}`, data),
 };
 
+// ─── Áreas ────────────────────────────────────────────────────────────────────
+export const areasAPI = {
+  getAll: () => api.get("/areas/"),
+  crear:  (data) => api.post("/areas/", data),
+}
+
+// ─── Cargos ───────────────────────────────────────────────────────────────────
+export const cargosAPI = {
+  getAll: () => api.get("/cargos/"),
+  crear:  (data) => api.post("/cargos/", data), // { nombre, area_id (UUID) }
+};
+
 // ─── Capacitaciones ───────────────────────────────────────────────────────────
 export const capacitacionesAPI = {
-  getAll:              ()              => api.get("/capacitaciones/"),
-  crear:               (data)          => api.post("/capacitaciones/", data),
-  getCobertura:        ()              => api.get("/capacitaciones/cobertura"),
-  getSesiones:         (id)            => api.get(`/capacitaciones/${id}/sesiones`),
-  crearSesion:         (data)          => api.post("/capacitaciones/sesiones", data),
-  registrarAsistencia: (data)          => api.post("/capacitaciones/asistencia", data),
-  getAsistencia:       (sesionId)      => api.get(`/capacitaciones/sesiones/${sesionId}/asistencia`),
-  crearEvaluacion:     (data)          => api.post("/capacitaciones/evaluaciones", data),
-  responderEvaluacion: (data)          => api.post("/capacitaciones/evaluaciones/responder", data),
-  getCertificado:      (evalId, empId) =>
+  getAll:              ()                   => api.get("/capacitaciones/"),
+  crear:               (data)               => api.post("/capacitaciones/", data),
+  actualizar:          (id, data)           => api.patch(`/capacitaciones/${id}`, data),
+  // suspender/activar son shortcuts sobre actualizar
+  suspender:           (id)                 => api.patch(`/capacitaciones/${id}`, { activo: false }),
+  activar:             (id)                 => api.patch(`/capacitaciones/${id}`, { activo: true }),
+  getCobertura:        ()                   => api.get("/capacitaciones/cobertura"),
+  getSesiones:         (id)                 => api.get(`/capacitaciones/${id}/sesiones`),
+  crearSesion:         (data)               => api.post("/capacitaciones/sesiones", data),
+  reprogramarSesion:   (sesionId, data)     => api.patch(`/capacitaciones/sesiones/${sesionId}`, data),
+  registrarAsistencia: (data)               => api.post("/capacitaciones/asistencia", data),
+  getAsistencia:       (sesionId)           => api.get(`/capacitaciones/sesiones/${sesionId}/asistencia`),
+  crearEvaluacion:     (data)               => api.post("/capacitaciones/evaluaciones", data),
+  responderEvaluacion: (data)               => api.post("/capacitaciones/evaluaciones/responder", data),
+  getCertificado:      (evalId, empId)      =>
     api.get(`/capacitaciones/evaluaciones/${evalId}/certificado/${empId}`, { responseType: "blob" }),
 };
 

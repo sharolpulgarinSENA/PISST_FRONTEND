@@ -13,27 +13,29 @@ import ResetPassword from './pages/ResetPassword'
 import CambiarPassword from './pages/CambiarPassword'
 import Mantenimiento from './pages/Mantenimiento'
 
-
 function PrivateRoute({ children, roles }) {
   const { token, user } = useAuth()
   if (!token) return <Navigate to="/login" replace />
   const userRole = user?.role?.toString?.().toLowerCase?.()
-  if (roles && !roles.map(r => r.toString().toLowerCase()).includes(userRole)) return <Navigate to="/login" replace />
+  if (roles && !roles.map(r => r.toString().toLowerCase()).includes(userRole)) {
+    return <Navigate to="/login" replace />
+  }
   return children
 }
 
 export default function App() {
   const { user } = useAuth()
-
   const userRole = user?.role?.toString?.().toLowerCase?.()
 
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+      {/* ── Rutas públicas (sin Layout, accesibles sin sesión) ── */}
+      <Route path="/login"           element={<Login />} />
+      <Route path="/reset-password"  element={<ResetPassword />} />
       <Route path="/cambiar-password" element={<CambiarPassword />} />
-      <Route path="/mantenimiento"    element={<Mantenimiento />} />
+      <Route path="/mantenimiento"   element={<Mantenimiento />} />
 
+      {/* ── Redirección raíz según rol ── */}
       <Route path="/" element={
         <PrivateRoute>
           {userRole === 'sst'      ? <Navigate to="/dashboard" replace /> :
@@ -43,7 +45,7 @@ export default function App() {
         </PrivateRoute>
       }/>
 
-      {/* Todas las páginas protegidas usan el Layout */}
+      {/* ── Páginas protegidas (todas dentro del Layout) ── */}
       <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route path="/dashboard"      element={<PrivateRoute roles={['sst','gerencia']}><Dashboard /></PrivateRoute>} />
         <Route path="/chat"           element={<PrivateRoute><Chat /></PrivateRoute>} />
@@ -54,48 +56,7 @@ export default function App() {
         <Route path="/usuarios"       element={<PrivateRoute roles={['sst']}><Usuarios /></PrivateRoute>} />
       </Route>
 
-      <Route path="/dashboard" element={
-        <PrivateRoute roles={['sst', 'gerencia']}>
-          <Dashboard />
-        </PrivateRoute>
-      }/>
-
-      <Route path="/chat" element={
-        <PrivateRoute>
-          <Chat />
-        </PrivateRoute>
-      }/>
-
-      <Route path="/incidentes" element={
-       <PrivateRoute>
-         <Incidentes />
-       </PrivateRoute>
-      }/>
-
-      <Route path="/capacitaciones" element={
-        <PrivateRoute roles={['sst']}>
-          <Capacitaciones />
-        </PrivateRoute>
-      }/>
-
-      <Route path="/riesgos" element={
-        <PrivateRoute roles={['sst']}>
-          <Riesgos />
-        </PrivateRoute>
-      }/>
-
-      <Route path="/auditorias" element={
-        <PrivateRoute roles={['sst']}>
-          <Auditorias />
-        </PrivateRoute>
-      }/>
-
-      <Route path="/usuarios" element={
-        <PrivateRoute roles={['sst']}>
-          <Usuarios />
-        </PrivateRoute>
-      }/>
-
+      {/* ── Catch-all ── */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )
