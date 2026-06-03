@@ -99,6 +99,8 @@ export default api;
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authAPI = {
   cambiarPassword: (data) => api.post("/auth/cambiar-password", data),
+  forgotPassword:  (data) => api.post("/auth/forgot-password",  data),
+  resetPassword:   (data) => api.post("/auth/reset-password",   data),
 };
 
 // ─── Métricas ─────────────────────────────────────────────────────────────────

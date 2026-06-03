@@ -8,7 +8,7 @@ import { useTheme } from "../context/ThemeContext";
 const REQUISITOS = [
   { id: "longitud",  label: "Mínimo 8 caracteres",          test: (p) => p.length >= 8 },
   { id: "mayuscula", label: "Al menos una mayúscula",       test: (p) => /[A-Z]/.test(p) },
-  { id: "simbolo",   label: "Al menos un símbolo (!@#$%…)", test: (p) => /[!@#$%^&*(),.?":{}|<>_\-+=/[\]\\;'`~]/.test(p) },
+  { id: "simbolo", label: 'Al menos un símbolo (!@#$%^&*(),.?":{}|<>_-)', test: (p) => /[!@#$%^&*(),.?":{}|<>_\-]/.test(p) },
 ];
 
 function extraerDetalle(err) {

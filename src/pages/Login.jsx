@@ -361,33 +361,43 @@ export default function Login() {
     ? 'linear-gradient(to right, #A5B4FC, #8B94FF)'
     : 'linear-gradient(to right, #6366F1, #4F46E5)'
 
-  async function handleLogin() {
-    if (!form.email || !form.password) { setError(t.fillFields); return }
-    setError('')
-    setLoading(true)
-    try {
-      const response = await api.post('/auth/login', {
-        email: form.email,
-        password: form.password,
-        recaptcha_token: 'test',
-      })
-      const { access_token, refresh_token, role, nombre, debe_cambiar_password } = response.data
-      const normalizedRole = role?.toString?.().toLowerCase?.()
-      login(access_token, refresh_token, { role: normalizedRole, nombre, email: form.email })
+ async function handleLogin() {
+  if (!form.email || !form.password) { setError(t.fillFields); return }
+  setError('')
+  setLoading(true)
+  try {
+    const response = await api.post('/auth/login', {
+      email: form.email,
+      password: form.password,
+      recaptcha_token: 'test',
+    })
+    const { access_token, refresh_token, role, nombre, debe_cambiar_password } = response.data
+    const normalizedRole = role?.toString?.().toLowerCase?.()
 
-      if (debe_cambiar_password) { navigate('/cambiar-password'); return }
+    login(access_token, refresh_token, { role: normalizedRole, nombre, email: form.email })
 
-      if (normalizedRole === 'sst' || normalizedRole === 'gerencia') navigate('/dashboard')
-      else navigate('/chat')
-    } catch (err) {
-      const status  = err.response?.status
-      const detalle = err.response?.data?.detail
-      if (status === 429) setError(t.tooMany)
-      else setError(typeof detalle === 'string' ? detalle : t.loginError)
-    } finally {
-      setLoading(false)
+    // ── Guardar el flag en sesión para que el guard de CambiarPassword lo lea ──
+    if (debe_cambiar_password) {
+      sessionStorage.setItem('pisst_debe_cambiar_password', 'true')
+      navigate('/cambiar-password')
+      return
     }
+
+    // Si ya no necesita cambiar contraseña, asegurarse de que el flag no exista
+    sessionStorage.removeItem('pisst_debe_cambiar_password')
+
+    if (normalizedRole === 'sst' || normalizedRole === 'gerencia') navigate('/dashboard')
+    else navigate('/chat')
+
+  } catch (err) {
+    const status  = err.response?.status
+    const detalle = err.response?.data?.detail
+    if (status === 429) setError(t.tooMany)
+    else setError(typeof detalle === 'string' ? detalle : t.loginError)
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: bg }}>
