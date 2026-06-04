@@ -2,12 +2,13 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   Plus, X, BookOpen, ChevronDown, Check, Power, PowerOff, Calendar, MapPin,
-  Users, CheckCircle, XCircle, AlertCircle, RotateCcw, Ban, Lock
+  Users, CheckCircle, XCircle, AlertCircle, RotateCcw, Ban,
+  ClipboardList, Trash2, GraduationCap
 } from 'lucide-react'
 import { capacitacionesAPI, areasAPI, usuariosAPI } from '../services/api'
 
 /* ══════════════════════════════════════════
-   UTILS
+   UTILS (sin cambios)
 ══════════════════════════════════════════ */
 function toColombiaISO(datetimeLocal) {
   if (!datetimeLocal) return null
@@ -21,7 +22,6 @@ function formatColombia(fechaStr, opts = { dateStyle: 'medium', timeStyle: 'shor
   return new Intl.DateTimeFormat('es-CO', { ...opts, timeZone: 'America/Bogota' }).format(new Date(normalized))
 }
 
-/* Convierte fecha del backend → string para input datetime-local en hora Colombia */
 function backendToInputLocal(raw) {
   if (!raw) return ''
   const normalized = /[Z+\-]\d{2}:\d{2}$|Z$/.test(raw) ? raw : raw + 'Z'
@@ -33,34 +33,25 @@ function backendToInputLocal(raw) {
   return `${p.year}-${p.month}-${p.day}T${p.hour === '24' ? '00' : p.hour}:${p.minute}`
 }
 
-/* Deriva el estado visual de una sesión a partir de `estado` (string del backend) + fecha */
 function estadoSesion(s) {
   const estado = s.estado || 'programada'
-  if (estado === 'cancelada')
-    return { key: 'cancelada', label: 'Cancelada', color: '#9CA3AF', bg: 'rgba(107,114,128,0.15)' }
-  if (estado === 'realizada')
-    return { key: 'realizada', label: 'Realizada', color: '#22C55E', bg: 'rgba(34,197,94,0.12)' }
-  if (estado === 'no_realizada')
-    return { key: 'no_realizada', label: 'No realizada', color: '#EF4444', bg: 'rgba(239,68,68,0.12)' }
-  // programada → distinguir por fecha
+  if (estado === 'cancelada')    return { key: 'cancelada',    label: 'Cancelada',           color: '#9CA3AF', bg: 'rgba(107,114,128,0.15)' }
+  if (estado === 'realizada')    return { key: 'realizada',    label: 'Realizada',            color: '#22C55E', bg: 'rgba(34,197,94,0.12)'   }
+  if (estado === 'no_realizada') return { key: 'no_realizada', label: 'No realizada',         color: '#EF4444', bg: 'rgba(239,68,68,0.12)'   }
   const normalized = /[Z+\-]\d{2}:\d{2}$|Z$/.test(s.fecha) ? s.fecha : s.fecha + 'Z'
   const esPasada = new Date(normalized) < new Date()
-  if (esPasada)
-    return { key: 'pendiente', label: 'Pendiente de cierre', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' }
-  return { key: 'programada', label: 'Programada', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' }
+  if (esPasada) return { key: 'pendiente',  label: 'Pendiente de cierre', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' }
+  return           { key: 'programada',  label: 'Programada',          color: '#3B82F6', bg: 'rgba(59,130,246,0.12)'  }
 }
 
 /* ══════════════════════════════════════════
-   HOOKS
+   HOOKS (sin cambios)
 ══════════════════════════════════════════ */
 function useAreas() {
   const [areas, setAreas]     = useState([])
   const [loading, setLoading] = useState(true)
   useEffect(() => {
-    areasAPI.getAll()
-      .then(r => setAreas(r.data))
-      .catch(() => setAreas([]))
-      .finally(() => setLoading(false))
+    areasAPI.getAll().then(r => setAreas(r.data)).catch(() => setAreas([])).finally(() => setLoading(false))
   }, [])
   return { areas, loading }
 }
@@ -69,10 +60,7 @@ function useEmpleadosPorAreas(areaIds) {
   const [todos, setTodos]     = useState([])
   const [loading, setLoading] = useState(true)
   useEffect(() => {
-    usuariosAPI.getAll(0, 200)
-      .then(r => setTodos(r.data))
-      .catch(() => setTodos([]))
-      .finally(() => setLoading(false))
+    usuariosAPI.getAll(0, 200).then(r => setTodos(r.data)).catch(() => setTodos([])).finally(() => setLoading(false))
   }, [])
   const empleados = useMemo(() => {
     if (!areaIds?.length) return todos.filter(u => u.role === 'empleado' && u.activo)
@@ -82,7 +70,7 @@ function useEmpleadosPorAreas(areaIds) {
 }
 
 /* ══════════════════════════════════════════
-   SELECTOR DE ÁREAS (multiselect)
+   COMPONENTES ATÓMICOS (sin cambios)
 ══════════════════════════════════════════ */
 function SelectorAreas({ areas, selected, onChange, darkMode }) {
   const [open, setOpen] = useState(false)
@@ -92,22 +80,15 @@ function SelectorAreas({ areas, selected, onChange, darkMode }) {
   const text   = darkMode ? '#F9FAFB' : '#111827'
   const sub    = darkMode ? '#9CA3AF' : '#6B7280'
   const card   = darkMode ? '#111827' : '#FFFFFF'
-
   useEffect(() => {
     const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
-
-  const toggle = (id) =>
-    onChange(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id])
-
-  const label = selected.length === 0
-    ? 'Sin áreas asignadas'
-    : selected.length === 1
-      ? areas.find(a => a.id === selected[0])?.nombre ?? '1 área'
-      : `${selected.length} áreas seleccionadas`
-
+  const toggle = (id) => onChange(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id])
+  const label = selected.length === 0 ? 'Sin áreas asignadas'
+    : selected.length === 1 ? areas.find(a => a.id === selected[0])?.nombre ?? '1 área'
+    : `${selected.length} áreas seleccionadas`
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(o => !o)}
@@ -117,12 +98,10 @@ function SelectorAreas({ areas, selected, onChange, darkMode }) {
         <ChevronDown size={14} style={{ color: sub, flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
       </button>
       {open && (
-        <div className="absolute z-50 w-full mt-1 rounded-xl shadow-xl overflow-hidden"
-             style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+        <div className="absolute z-50 w-full mt-1 rounded-xl shadow-xl overflow-hidden" style={{ backgroundColor: card, border: `1px solid ${border}` }}>
           {areas.length === 0
             ? <p className="px-3 py-3 text-xs" style={{ color: sub }}>No hay áreas disponibles.</p>
-            : (
-              <ul className="max-h-48 overflow-y-auto py-1">
+            : <ul className="max-h-48 overflow-y-auto py-1">
                 {areas.map(a => {
                   const sel = selected.includes(a.id)
                   return (
@@ -140,7 +119,7 @@ function SelectorAreas({ areas, selected, onChange, darkMode }) {
                   )
                 })}
               </ul>
-            )}
+          }
         </div>
       )}
     </div>
@@ -157,7 +136,7 @@ function BadgeEstado({ estado }) {
 }
 
 /* ══════════════════════════════════════════
-   MINI-MODAL: CERRAR SESIÓN (realizada / no realizada)
+   MODAL: CERRAR SESIÓN (sin cambios)
 ══════════════════════════════════════════ */
 function ModalCerrarSesion({ darkMode, sesion, onClose, onConfirmar, loading }) {
   const card   = darkMode ? '#111827' : '#FFFFFF'
@@ -165,12 +144,9 @@ function ModalCerrarSesion({ darkMode, sesion, onClose, onConfirmar, loading }) 
   const text   = darkMode ? '#F9FAFB' : '#111827'
   const sub    = darkMode ? '#9CA3AF' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
-
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4"
-         style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-      <div className="w-full max-w-sm rounded-2xl shadow-2xl"
-           style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+      <div className="w-full max-w-sm rounded-2xl shadow-2xl" style={{ backgroundColor: card, border: `1px solid ${border}` }}>
         <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: border }}>
           <h3 className="font-bold text-base" style={{ color: text }}>Cerrar sesión</h3>
           <button onClick={onClose} disabled={loading}><X size={16} style={{ color: sub }} /></button>
@@ -182,28 +158,20 @@ function ModalCerrarSesion({ darkMode, sesion, onClose, onConfirmar, loading }) 
           </div>
           <p className="text-sm" style={{ color: sub }}>¿Cómo terminó esta sesión?</p>
           <div className="space-y-2">
-            <button
-              onClick={() => onConfirmar('realizada')}
-              disabled={loading}
+            <button onClick={() => onConfirmar('realizada')} disabled={loading}
               className="w-full py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition disabled:opacity-50"
-              style={{ backgroundColor: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.4)' }}
-            >
+              style={{ backgroundColor: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.4)' }}>
               <CheckCircle size={16} /> Se realizó con éxito
             </button>
-            <button
-              onClick={() => onConfirmar('no_realizada')}
-              disabled={loading}
+            <button onClick={() => onConfirmar('no_realizada')} disabled={loading}
               className="w-full py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition disabled:opacity-50"
-              style={{ backgroundColor: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.4)' }}
-            >
+              style={{ backgroundColor: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.4)' }}>
               <XCircle size={16} /> No se realizó
             </button>
           </div>
         </div>
         <div className="flex justify-end px-5 py-3 border-t" style={{ borderColor: border }}>
-          <button onClick={onClose} disabled={loading} className="px-4 py-2 text-sm rounded-lg" style={{ color: sub }}>
-            Cancelar
-          </button>
+          <button onClick={onClose} disabled={loading} className="px-4 py-2 text-sm rounded-lg" style={{ color: sub }}>Cancelar</button>
         </div>
       </div>
     </div>
@@ -211,13 +179,12 @@ function ModalCerrarSesion({ darkMode, sesion, onClose, onConfirmar, loading }) 
 }
 
 /* ══════════════════════════════════════════
-   PANEL DE ASISTENCIA
+   PANEL DE ASISTENCIA (sin cambios)
 ══════════════════════════════════════════ */
 function PanelAsistencia({ sesion, capacitacion, theme }) {
   const { text, sub, input, border } = theme
   const areaIds = capacitacion.areas?.map(a => a.id) ?? []
   const { empleados, loading: loadingEmp } = useEmpleadosPorAreas(areaIds)
-
   const [asistencia, setAsistencia]   = useState({})
   const [guardando, setGuardando]     = useState({})
   const [loadingAsis, setLoadingAsis] = useState(true)
@@ -225,11 +192,7 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
   useEffect(() => {
     setLoadingAsis(true)
     capacitacionesAPI.getAsistencia(sesion.id)
-      .then(r => {
-        const map = {}
-        r.data.forEach(a => { map[a.empleado_id] = a.estado })
-        setAsistencia(map)
-      })
+      .then(r => { const map = {}; r.data.forEach(a => { map[a.empleado_id] = a.estado }); setAsistencia(map) })
       .catch(() => {})
       .finally(() => setLoadingAsis(false))
   }, [sesion.id])
@@ -239,11 +202,8 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
     try {
       await capacitacionesAPI.registrarAsistencia({ sesion_id: sesion.id, empleado_id: empleadoId, estado })
       setAsistencia(a => ({ ...a, [empleadoId]: estado }))
-    } catch (e) {
-      console.error('Error registrando asistencia:', e)
-    } finally {
-      setGuardando(g => ({ ...g, [empleadoId]: false }))
-    }
+    } catch (e) { console.error(e) }
+    finally { setGuardando(g => ({ ...g, [empleadoId]: false })) }
   }
 
   const ESTADOS = [
@@ -252,20 +212,15 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
     { value: 'justificado', label: 'Justificado', icon: AlertCircle, color: '#F59E0B' },
   ]
 
-  if (loadingAsis || loadingEmp)
-    return <p className="text-sm text-center py-6" style={{ color: sub }}>Cargando empleados…</p>
-
-  if (empleados.length === 0)
-    return (
-      <div className="text-center py-8">
-        <Users size={32} className="mx-auto mb-2" style={{ color: sub }} />
-        <p className="text-sm" style={{ color: sub }}>
-          {areaIds.length === 0
-            ? 'Esta capacitación no tiene áreas asignadas.'
-            : 'No hay empleados activos en las áreas asignadas.'}
-        </p>
-      </div>
-    )
+  if (loadingAsis || loadingEmp) return <p className="text-sm text-center py-6" style={{ color: sub }}>Cargando empleados…</p>
+  if (empleados.length === 0) return (
+    <div className="text-center py-8">
+      <Users size={32} className="mx-auto mb-2" style={{ color: sub }} />
+      <p className="text-sm" style={{ color: sub }}>
+        {areaIds.length === 0 ? 'Esta capacitación no tiene áreas asignadas.' : 'No hay empleados activos en las áreas asignadas.'}
+      </p>
+    </div>
+  )
 
   const total     = empleados.length
   const presentes = Object.values(asistencia).filter(e => e === 'presente').length
@@ -276,8 +231,8 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2">
         {[
-          { label: 'Presentes',    value: presentes, color: '#22C55E', bg: 'rgba(34,197,94,0.1)' },
-          { label: 'Ausentes',     value: ausentes,  color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
+          { label: 'Presentes',    value: presentes, color: '#22C55E', bg: 'rgba(34,197,94,0.1)'  },
+          { label: 'Ausentes',     value: ausentes,  color: '#EF4444', bg: 'rgba(239,68,68,0.1)'  },
           { label: 'Justificados', value: justif,    color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
         ].map(s => (
           <div key={s.label} className="rounded-lg p-2.5 text-center" style={{ backgroundColor: s.bg }}>
@@ -286,9 +241,7 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
           </div>
         ))}
       </div>
-
       <p className="text-xs" style={{ color: sub }}>{total} empleados en esta capacitación</p>
-
       <div className="space-y-2">
         {empleados.map(emp => {
           const estadoActual = asistencia[emp.id]
@@ -297,9 +250,7 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
             <div key={emp.id} className="rounded-lg p-3 flex items-center justify-between gap-3" style={{ backgroundColor: input }}>
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate" style={{ color: text }}>{emp.nombre}</p>
-                <p className="text-xs truncate" style={{ color: sub }}>
-                  {emp.cargo_nombre ?? 'Sin cargo'} · {emp.area_nombre ?? 'Sin área'}
-                </p>
+                <p className="text-xs truncate" style={{ color: sub }}>{emp.cargo_nombre ?? 'Sin cargo'} · {emp.area_nombre ?? 'Sin área'}</p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 {ESTADOS.map(e => {
@@ -309,11 +260,7 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
                     <button key={e.value} onClick={() => !cargando && marcar(emp.id, e.value)}
                       disabled={cargando} title={e.label}
                       className="w-8 h-8 rounded-lg flex items-center justify-center transition disabled:opacity-40"
-                      style={{
-                        backgroundColor: activo ? e.color + '22' : 'transparent',
-                        border: `1px solid ${activo ? e.color : border}`,
-                        color: activo ? e.color : sub,
-                      }}>
+                      style={{ backgroundColor: activo ? e.color + '22' : 'transparent', border: `1px solid ${activo ? e.color : border}`, color: activo ? e.color : sub }}>
                       <Icon size={15} />
                     </button>
                   )
@@ -328,7 +275,283 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
 }
 
 /* ══════════════════════════════════════════
-   MODAL: NUEVA CAPACITACIÓN
+   ✅ NUEVO: PANEL DE EVALUACIONES
+   Solo para sesiones con estado "realizada"
+   El SST crea evaluación con preguntas
+══════════════════════════════════════════ */
+const OPCIONES = ['a', 'b', 'c', 'd']
+const OPCION_LABEL = { a: 'A', b: 'B', c: 'C', d: 'D' }
+
+function preguntaVacia() {
+  return { texto: '', opcion_a: '', opcion_b: '', opcion_c: '', opcion_d: '', respuesta_correcta: 'a' }
+}
+
+function PanelEvaluaciones({ sesion, theme }) {
+  const { text, sub, input, border, card } = theme
+
+  const [evaluacion, setEvaluacion]   = useState(null) // evaluación existente si ya hay una
+  const [loadingEval, setLoadingEval] = useState(false)
+  const [modo, setModo]               = useState('ver') // 'ver' | 'crear'
+  const [banner, setBanner]           = useState({ type: '', msg: '' })
+
+  // Form para crear
+  const [titulo, setTitulo]               = useState('')
+  const [puntajeMin, setPuntajeMin]       = useState(60)
+  const [preguntas, setPreguntas]         = useState([preguntaVacia()])
+  const [guardando, setGuardando]         = useState(false)
+
+  // Cargar evaluación existente de esta sesión (si tiene)
+  // El backend no tiene GET evaluación por sesión directamente, pero
+  // al crear devuelve la evaluación completa con preguntas
+  // La guardamos en estado local al crearla
+
+  const setPregunta = (i, campo, valor) =>
+    setPreguntas(ps => ps.map((p, idx) => idx === i ? { ...p, [campo]: valor } : p))
+
+  const agregarPregunta = () => {
+    if (preguntas.length >= 20) return
+    setPreguntas(ps => [...ps, preguntaVacia()])
+  }
+
+  const eliminarPregunta = (i) => {
+    if (preguntas.length <= 1) return
+    setPreguntas(ps => ps.filter((_, idx) => idx !== i))
+  }
+
+  const guardarEvaluacion = async () => {
+    setBanner({ type: '', msg: '' })
+    if (!titulo.trim()) { setBanner({ type: 'error', msg: 'El título es obligatorio.' }); return }
+    if (preguntas.length < 1) { setBanner({ type: 'error', msg: 'Agrega al menos 1 pregunta.' }); return }
+
+    const preguntasInvalidas = preguntas.some(
+      p => !p.texto.trim() || !p.opcion_a.trim() || !p.opcion_b.trim() || !p.opcion_c.trim() || !p.opcion_d.trim()
+    )
+    if (preguntasInvalidas) { setBanner({ type: 'error', msg: 'Completa todos los campos de cada pregunta.' }); return }
+
+    setGuardando(true)
+    try {
+      const { data } = await capacitacionesAPI.crearEvaluacion({
+        titulo:         titulo.trim(),
+        puntaje_minimo: Number(puntajeMin),
+        sesion_id:      sesion.id,
+        preguntas:      preguntas.map(p => ({
+          texto:               p.texto.trim(),
+          opcion_a:            p.opcion_a.trim(),
+          opcion_b:            p.opcion_b.trim(),
+          opcion_c:            p.opcion_c.trim(),
+          opcion_d:            p.opcion_d.trim(),
+          respuesta_correcta:  p.respuesta_correcta,
+        })),
+      })
+      setEvaluacion(data)
+      setModo('ver')
+      setBanner({ type: 'ok', msg: 'Evaluación creada correctamente.' })
+    } catch (err) {
+      setBanner({ type: 'error', msg: err.response?.data?.detail || 'Error al crear la evaluación.' })
+    } finally { setGuardando(false) }
+  }
+
+  // ── Vista: ya existe evaluación ──
+  if (evaluacion && modo === 'ver') {
+    return (
+      <div className="space-y-4">
+        {banner.msg && (
+          <div className={`text-sm rounded-lg px-4 py-3 border ${banner.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+            {banner.msg}
+          </div>
+        )}
+
+        <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: input, border: `1px solid ${border}` }}>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-semibold text-sm" style={{ color: text }}>{evaluacion.titulo}</p>
+              <p className="text-xs mt-0.5" style={{ color: sub }}>
+                Puntaje mínimo: {evaluacion.puntaje_minimo}% · {evaluacion.preguntas?.length ?? 0} preguntas
+              </p>
+            </div>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: 'rgba(34,197,94,0.12)', color: '#22C55E' }}>
+              Creada ✓
+            </span>
+          </div>
+
+          {/* Lista de preguntas */}
+          <div className="space-y-2 pt-1">
+            {evaluacion.preguntas?.map((p, i) => (
+              <div key={p.id} className="rounded-lg p-3" style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+                <p className="text-xs font-semibold mb-2" style={{ color: text }}>
+                  {i + 1}. {p.texto}
+                </p>
+                <div className="grid grid-cols-2 gap-1">
+                  {OPCIONES.map(op => (
+                    <p key={op} className="text-xs" style={{ color: sub }}>
+                      <span className="font-medium" style={{ color: text }}>{OPCION_LABEL[op]}.</span> {p[`opcion_${op}`]}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg p-3 flex items-start gap-2" style={{ backgroundColor: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+          <GraduationCap size={16} style={{ color: '#6366F1', flexShrink: 0, marginTop: 1 }} />
+          <p className="text-xs" style={{ color: '#818CF8' }}>
+            Los empleados podrán responder esta evaluación desde el módulo de empleado.
+            Si aprueban, podrán descargar su certificado.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Vista: crear evaluación ──
+  if (modo === 'crear') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold" style={{ color: text }}>Nueva evaluación</p>
+          <button onClick={() => { setModo('ver'); setBanner({ type: '', msg: '' }) }}
+            className="text-xs hover:opacity-70" style={{ color: sub }}>
+            ← Cancelar
+          </button>
+        </div>
+
+        {banner.msg && (
+          <div className={`text-sm rounded-lg px-4 py-3 border ${banner.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+            {banner.msg}
+          </div>
+        )}
+
+        {/* Título + puntaje */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2">
+            <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Título de la evaluación *</label>
+            <input type="text" value={titulo} onChange={e => setTitulo(e.target.value)}
+              placeholder="Ej: Evaluación final EPP"
+              className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+              style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }} />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Puntaje mínimo (%)</label>
+            <input type="number" min={1} max={100} value={puntajeMin}
+              onChange={e => setPuntajeMin(e.target.value)}
+              className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+              style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }} />
+          </div>
+        </div>
+
+        {/* Preguntas */}
+        <div className="space-y-4">
+          {preguntas.map((p, i) => (
+            <div key={i} className="rounded-xl p-4 space-y-3" style={{ backgroundColor: input, border: `1px solid ${border}` }}>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold" style={{ color: '#6366F1' }}>Pregunta {i + 1}</p>
+                {preguntas.length > 1 && (
+                  <button onClick={() => eliminarPregunta(i)} className="hover:opacity-70" title="Eliminar pregunta">
+                    <Trash2 size={13} style={{ color: '#EF4444' }} />
+                  </button>
+                )}
+              </div>
+
+              {/* Texto */}
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: sub }}>Enunciado *</label>
+                <textarea rows={2} value={p.texto} onChange={e => setPregunta(i, 'texto', e.target.value)}
+                  placeholder="Escribe la pregunta..."
+                  className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none"
+                  style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
+              </div>
+
+              {/* Opciones */}
+              <div className="grid grid-cols-2 gap-2">
+                {OPCIONES.map(op => (
+                  <div key={op}>
+                    <label className="text-xs mb-1 flex items-center gap-1.5" style={{ color: sub }}>
+                      <span className="w-4 h-4 rounded flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            style={{ backgroundColor: p.respuesta_correcta === op ? '#6366F1' : 'transparent',
+                                     color: p.respuesta_correcta === op ? '#fff' : sub,
+                                     border: `1px solid ${p.respuesta_correcta === op ? '#6366F1' : border}` }}>
+                        {OPCION_LABEL[op]}
+                      </span>
+                      Opción {OPCION_LABEL[op]}
+                      {p.respuesta_correcta === op && <span style={{ color: '#22C55E', fontSize: 10 }}>✓ Correcta</span>}
+                    </label>
+                    <input type="text" value={p[`opcion_${op}`]}
+                      onChange={e => setPregunta(i, `opcion_${op}`, e.target.value)}
+                      placeholder={`Opción ${OPCION_LABEL[op]}`}
+                      className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none"
+                      style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Respuesta correcta */}
+              <div>
+                <label className="text-xs mb-2 block" style={{ color: sub }}>Respuesta correcta</label>
+                <div className="flex gap-2">
+                  {OPCIONES.map(op => (
+                    <button key={op} type="button" onClick={() => setPregunta(i, 'respuesta_correcta', op)}
+                      className="w-9 h-9 rounded-lg text-sm font-bold transition"
+                      style={{
+                        backgroundColor: p.respuesta_correcta === op ? '#6366F1' : 'transparent',
+                        color:           p.respuesta_correcta === op ? '#fff'    : sub,
+                        border: `1px solid ${p.respuesta_correcta === op ? '#6366F1' : border}`,
+                      }}>
+                      {OPCION_LABEL[op]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Agregar pregunta */}
+        {preguntas.length < 20 && (
+          <button onClick={agregarPregunta} type="button"
+            className="w-full py-2 rounded-lg text-sm font-medium transition"
+            style={{ color: '#6366F1', border: `1px dashed ${border}`, backgroundColor: 'transparent' }}>
+            + Agregar pregunta ({preguntas.length}/20)
+          </button>
+        )}
+
+        {/* Guardar */}
+        <button onClick={guardarEvaluacion} disabled={guardando}
+          className="w-full py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+          style={{ backgroundColor: '#6366F1' }}>
+          {guardando ? 'Guardando...' : 'Crear evaluación'}
+        </button>
+      </div>
+    )
+  }
+
+  // ── Vista: sin evaluación aún ──
+  return (
+    <div className="space-y-4">
+      {banner.msg && (
+        <div className={`text-sm rounded-lg px-4 py-3 border ${banner.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+          {banner.msg}
+        </div>
+      )}
+      <div className="text-center py-8 space-y-3">
+        <ClipboardList size={36} className="mx-auto" style={{ color: sub }} />
+        <p className="text-sm font-medium" style={{ color: text }}>Sin evaluación</p>
+        <p className="text-xs" style={{ color: sub }}>
+          Crea una evaluación para que los empleados puedan responderla y obtener su certificado.
+        </p>
+        <button onClick={() => setModo('crear')}
+          className="px-5 py-2 rounded-lg text-sm font-semibold text-white"
+          style={{ backgroundColor: '#6366F1' }}>
+          Crear evaluación
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════
+   MODAL: NUEVA CAPACITACIÓN (sin cambios)
 ══════════════════════════════════════════ */
 function ModalNuevaCapacitacion({ darkMode, onClose, onCreada }) {
   const card   = darkMode ? '#111827' : '#FFFFFF'
@@ -336,7 +559,6 @@ function ModalNuevaCapacitacion({ darkMode, onClose, onCreada }) {
   const text   = darkMode ? '#F9FAFB' : '#111827'
   const sub    = darkMode ? '#9CA3AF' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
-
   const { areas, loading: loadingAreas } = useAreas()
   const [form, setForm]       = useState({ titulo: '', objetivos: '', duracion_horas: 1 })
   const [areaIds, setAreaIds] = useState([])
@@ -350,8 +572,7 @@ function ModalNuevaCapacitacion({ darkMode, onClose, onCreada }) {
     setBanner(''); setLoading(true)
     try {
       await capacitacionesAPI.crear({
-        titulo: form.titulo,
-        objetivos: form.objetivos || undefined,
+        titulo: form.titulo, objetivos: form.objetivos || undefined,
         duracion_horas: Number(form.duracion_horas),
         area_ids: areaIds.length > 0 ? areaIds : undefined,
       })
@@ -413,7 +634,7 @@ function ModalNuevaCapacitacion({ darkMode, onClose, onCreada }) {
 }
 
 /* ══════════════════════════════════════════
-   MODAL: REPROGRAMAR SESIÓN
+   MODAL: REPROGRAMAR (sin cambios)
 ══════════════════════════════════════════ */
 function ModalReprogramar({ darkMode, sesion, onClose, onReprogramada }) {
   const card   = darkMode ? '#111827' : '#FFFFFF'
@@ -421,7 +642,6 @@ function ModalReprogramar({ darkMode, sesion, onClose, onReprogramada }) {
   const text   = darkMode ? '#F9FAFB' : '#111827'
   const sub    = darkMode ? '#9CA3AF' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
-
   const [form, setForm]       = useState({ fecha: backendToInputLocal(sesion.fecha), lugar: sesion.lugar ?? '' })
   const [banner, setBanner]   = useState('')
   const [loading, setLoading] = useState(false)
@@ -482,18 +702,18 @@ function ModalReprogramar({ darkMode, sesion, onClose, onReprogramada }) {
 }
 
 /* ══════════════════════════════════════════
-   FILA DE SESIÓN (con acciones según estado)
+   FILA DE SESIÓN — con pestaña evaluación
 ══════════════════════════════════════════ */
-function FilaSesion({ sesion, theme, onReprogramar, onAsistencia, onCerrar, onCambiarEstado, accionEnCurso }) {
+function FilaSesion({ sesion, theme, onReprogramar, onAsistencia, onCerrar, onCambiarEstado, accionEnCurso, onEvaluacion }) {
   const { text, sub, input } = theme
   const estado = estadoSesion(sesion)
 
-  // Acciones según el estado derivado
   const puedeReprogramar = estado.key === 'programada' || estado.key === 'pendiente'
   const puedeCancelar    = estado.key === 'programada' || estado.key === 'pendiente'
   const puedeCerrar      = estado.key === 'pendiente'
   const puedeAsistencia  = estado.key === 'pendiente' || estado.key === 'realizada'
   const puedeReabrir     = estado.key === 'no_realizada' || estado.key === 'cancelada'
+  const puedeEvaluacion  = estado.key === 'realizada'
 
   return (
     <div className="rounded-lg p-3" style={{ backgroundColor: input }}>
@@ -504,8 +724,6 @@ function FilaSesion({ sesion, theme, onReprogramar, onAsistencia, onCerrar, onCa
         </div>
         <BadgeEstado estado={estado} />
       </div>
-
-      {/* Acciones */}
       <div className="flex items-center gap-2 flex-wrap mt-3">
         {puedeCerrar && (
           <button onClick={() => onCerrar(sesion)} disabled={accionEnCurso}
@@ -519,6 +737,13 @@ function FilaSesion({ sesion, theme, onReprogramar, onAsistencia, onCerrar, onCa
             className="text-xs font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 disabled:opacity-50"
             style={{ color: '#22C55E', backgroundColor: 'rgba(34,197,94,0.1)' }}>
             <Users size={12} /> Asistencia
+          </button>
+        )}
+        {puedeEvaluacion && (
+          <button onClick={() => onEvaluacion(sesion)} disabled={accionEnCurso}
+            className="text-xs font-semibold px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 disabled:opacity-50"
+            style={{ color: '#8B5CF6', backgroundColor: 'rgba(139,92,246,0.1)' }}>
+            <ClipboardList size={12} /> Evaluación
           </button>
         )}
         {puedeReprogramar && (
@@ -549,6 +774,7 @@ function FilaSesion({ sesion, theme, onReprogramar, onAsistencia, onCerrar, onCa
 
 /* ══════════════════════════════════════════
    MODAL: DETALLE CAPACITACIÓN
+   ✅ Con panel de evaluación integrado
 ══════════════════════════════════════════ */
 function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualizada }) {
   const card   = darkMode ? '#111827' : '#FFFFFF'
@@ -558,17 +784,18 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
   const theme  = { card, border, text, sub, input }
 
-  const [capacitacion, setCapacitacion]     = useState(capInicial)
-  const [tab, setTab]                       = useState('sesiones')
-  const [sesiones, setSesiones]             = useState([])
+  const [capacitacion, setCapacitacion]         = useState(capInicial)
+  const [tab, setTab]                           = useState('sesiones')
+  const [sesiones, setSesiones]                 = useState([])
   const [sesionAsistencia, setSesionAsistencia] = useState(null)
+  const [sesionEvaluacion, setSesionEvaluacion] = useState(null)
   const [sesionReprogramar, setSesionReprogramar] = useState(null)
-  const [sesionCerrar, setSesionCerrar]     = useState(null)
-  const [banner, setBanner]                 = useState('')
-  const [sesionForm, setSesionForm]         = useState({ fecha: '', lugar: '' })
-  const [loading, setLoading]               = useState(false)
-  const [loadingToggle, setLoadingToggle]   = useState(false)
-  const [accionSesion, setAccionSesion]     = useState(false)
+  const [sesionCerrar, setSesionCerrar]         = useState(null)
+  const [banner, setBanner]                     = useState('')
+  const [sesionForm, setSesionForm]             = useState({ fecha: '', lugar: '' })
+  const [loading, setLoading]                   = useState(false)
+  const [loadingToggle, setLoadingToggle]       = useState(false)
+  const [accionSesion, setAccionSesion]         = useState(false)
 
   const { areas, loading: loadingAreas } = useAreas()
   const [editForm, setEditForm] = useState({
@@ -580,9 +807,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
   const setEdit = (k, v) => setEditForm(f => ({ ...f, [k]: v }))
 
   const cargarSesiones = () =>
-    capacitacionesAPI.getSesiones(capacitacion.id)
-      .then(r => setSesiones(r.data))
-      .catch(console.error)
+    capacitacionesAPI.getSesiones(capacitacion.id).then(r => setSesiones(r.data)).catch(console.error)
 
   useEffect(() => { cargarSesiones() }, [capacitacion.id])
 
@@ -593,8 +818,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
         ? await capacitacionesAPI.suspender(capacitacion.id)
         : await capacitacionesAPI.activar(capacitacion.id)
       setCapacitacion(data); onActualizada()
-    } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al cambiar el estado.')
+    } catch (err) { setBanner(err.response?.data?.detail || 'Error al cambiar el estado.')
     } finally { setLoadingToggle(false) }
   }
 
@@ -603,27 +827,19 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
     setBanner(''); setLoading(true)
     try {
       await capacitacionesAPI.crearSesion({
-        fecha: toColombiaISO(sesionForm.fecha),
-        lugar: sesionForm.lugar || undefined,
-        capacitacion_id: capacitacion.id,
+        fecha: toColombiaISO(sesionForm.fecha), lugar: sesionForm.lugar || undefined, capacitacion_id: capacitacion.id,
       })
-      await cargarSesiones()
-      setSesionForm({ fecha: '', lugar: '' })
-    } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al crear la sesión.')
+      await cargarSesiones(); setSesionForm({ fecha: '', lugar: '' })
+    } catch (err) { setBanner(err.response?.data?.detail || 'Error al crear la sesión.')
     } finally { setLoading(false) }
   }
 
-  /* Cambiar estado de sesión (cancelar, reabrir, cerrar) */
   const cambiarEstadoSesion = async (sesion, estado) => {
     setAccionSesion(true); setBanner('')
     try {
       await capacitacionesAPI.cambiarEstadoSesion(sesion.id, estado)
-      await cargarSesiones()
-      onActualizada() // refresca cobertura del listado principal
-      setSesionCerrar(null)
-    } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al cambiar el estado de la sesión.')
+      await cargarSesiones(); onActualizada(); setSesionCerrar(null)
+    } catch (err) { setBanner(err.response?.data?.detail || 'Error al cambiar el estado de la sesión.')
     } finally { setAccionSesion(false) }
   }
 
@@ -632,49 +848,67 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
     setBannerEdit({ type: '', msg: '' }); setLoadingEdit(true)
     try {
       const { data } = await capacitacionesAPI.actualizar(capacitacion.id, {
-        titulo: editForm.titulo.trim(),
-        objetivos: editForm.objetivos.trim() || undefined,
-        duracion_horas: Number(editForm.duracion_horas),
-        area_ids: editAreaIds,
+        titulo: editForm.titulo.trim(), objetivos: editForm.objetivos.trim() || undefined,
+        duracion_horas: Number(editForm.duracion_horas), area_ids: editAreaIds,
       })
       setCapacitacion(data); onActualizada()
       setBannerEdit({ type: 'ok', msg: 'Cambios guardados correctamente.' })
-    } catch (err) {
-      setBannerEdit({ type: 'error', msg: err.response?.data?.detail || 'Error al guardar.' })
+    } catch (err) { setBannerEdit({ type: 'error', msg: err.response?.data?.detail || 'Error al guardar.' })
     } finally { setLoadingEdit(false) }
   }
 
   const esActiva = capacitacion.activo
   const TABS = [
-    { id: 'sesiones', label: '📅 Sesiones' },
+    { id: 'sesiones', label: '📅 Sesiones'   },
     { id: 'info',     label: 'ℹ️ Información' },
-    { id: 'editar',   label: '✏️ Editar' },
+    { id: 'editar',   label: '✏️ Editar'      },
   ]
 
-  /* Vista de asistencia (reemplaza el contenido del modal) */
-  if (sesionAsistencia) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
-        <div className="w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col" style={{ backgroundColor: card, border: `1px solid ${border}` }}>
-          <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
-            <div>
-              <button onClick={() => setSesionAsistencia(null)} className="text-xs flex items-center gap-1 mb-1 hover:opacity-70" style={{ color: '#6366F1' }}>
-                ← Volver a sesiones
-              </button>
-              <h2 className="font-bold text-base" style={{ color: text }}>Control de asistencia</h2>
-              <p className="text-xs mt-0.5" style={{ color: sub }}>
-                {formatColombia(sesionAsistencia.fecha)} {sesionAsistencia.lugar ? `· ${sesionAsistencia.lugar}` : ''}
-              </p>
-            </div>
-            <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+  // ── Vista asistencia ──
+  if (sesionAsistencia) return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+      <div className="w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col" style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
+          <div>
+            <button onClick={() => setSesionAsistencia(null)} className="text-xs flex items-center gap-1 mb-1 hover:opacity-70" style={{ color: '#6366F1' }}>
+              ← Volver a sesiones
+            </button>
+            <h2 className="font-bold text-base" style={{ color: text }}>Control de asistencia</h2>
+            <p className="text-xs mt-0.5" style={{ color: sub }}>
+              {formatColombia(sesionAsistencia.fecha)} {sesionAsistencia.lugar ? `· ${sesionAsistencia.lugar}` : ''}
+            </p>
           </div>
-          <div className="flex-1 overflow-y-auto px-6 py-5">
-            <PanelAsistencia sesion={sesionAsistencia} capacitacion={capacitacion} theme={theme} />
-          </div>
+          <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <PanelAsistencia sesion={sesionAsistencia} capacitacion={capacitacion} theme={theme} />
         </div>
       </div>
-    )
-  }
+    </div>
+  )
+
+  // ── Vista evaluación ──
+  if (sesionEvaluacion) return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+      <div className="w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col" style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
+          <div>
+            <button onClick={() => setSesionEvaluacion(null)} className="text-xs flex items-center gap-1 mb-1 hover:opacity-70" style={{ color: '#6366F1' }}>
+              ← Volver a sesiones
+            </button>
+            <h2 className="font-bold text-base" style={{ color: text }}>Evaluación de sesión</h2>
+            <p className="text-xs mt-0.5" style={{ color: sub }}>
+              {formatColombia(sesionEvaluacion.fecha)} {sesionEvaluacion.lugar ? `· ${sesionEvaluacion.lugar}` : ''}
+            </p>
+          </div>
+          <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <PanelEvaluaciones sesion={sesionEvaluacion} theme={theme} />
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <>
@@ -692,8 +926,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
                 </span>
               </div>
               <p className="text-xs mt-0.5" style={{ color: sub }}>
-                {capacitacion.duracion_horas}h
-                {capacitacion.areas?.length > 0 && <> · {capacitacion.areas.map(a => a.nombre).join(', ')}</>}
+                {capacitacion.duracion_horas}h {capacitacion.areas?.length > 0 && <> · {capacitacion.areas.map(a => a.nombre).join(', ')}</>}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -728,15 +961,12 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
                   <p className="text-sm text-center py-4" style={{ color: sub }}>No hay sesiones programadas.</p>
                 )}
                 {sesiones.map(s => (
-                  <FilaSesion
-                    key={s.id}
-                    sesion={s}
-                    theme={theme}
-                    accionEnCurso={accionSesion}
+                  <FilaSesion key={s.id} sesion={s} theme={theme} accionEnCurso={accionSesion}
                     onReprogramar={setSesionReprogramar}
                     onAsistencia={setSesionAsistencia}
                     onCerrar={setSesionCerrar}
                     onCambiarEstado={cambiarEstadoSesion}
+                    onEvaluacion={setSesionEvaluacion}
                   />
                 ))}
 
@@ -801,9 +1031,9 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
             {tab === 'editar' && (
               <div className="space-y-4">
                 {bannerEdit.msg && (
-                  <div className={`text-sm rounded-lg px-4 py-3 border ${
-                    bannerEdit.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'
-                  }`}>{bannerEdit.msg}</div>
+                  <div className={`text-sm rounded-lg px-4 py-3 border ${bannerEdit.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                    {bannerEdit.msg}
+                  </div>
                 )}
                 {[
                   { key: 'titulo', label: 'Título *', type: 'text' },
@@ -819,8 +1049,8 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
                 ))}
                 <div>
                   <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Objetivos</label>
-                  <textarea rows={3} value={editForm.objetivos}
-                    onChange={e => setEdit('objetivos', e.target.value)} placeholder="Describe los objetivos..."
+                  <textarea rows={3} value={editForm.objetivos} onChange={e => setEdit('objetivos', e.target.value)}
+                    placeholder="Describe los objetivos..."
                     className="w-full rounded-lg px-3 py-2.5 text-sm outline-none border border-transparent resize-none"
                     style={{ backgroundColor: input, color: text }} />
                 </div>
@@ -846,7 +1076,6 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
           onClose={() => setSesionReprogramar(null)}
           onReprogramada={() => { cargarSesiones(); setSesionReprogramar(null) }} />
       )}
-
       {sesionCerrar && (
         <ModalCerrarSesion darkMode={darkMode} sesion={sesionCerrar} loading={accionSesion}
           onClose={() => setSesionCerrar(null)}
@@ -857,7 +1086,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
 }
 
 /* ══════════════════════════════════════════
-   PÁGINA PRINCIPAL
+   PÁGINA PRINCIPAL (sin cambios)
 ══════════════════════════════════════════ */
 export default function Capacitaciones() {
   const { darkMode } = useOutletContext()
@@ -880,17 +1109,12 @@ export default function Capacitaciones() {
       const { data } = await capacitacionesAPI.getAll()
       const arr = Array.isArray(data) ? data : data.items ?? data.capacitaciones ?? data.data ?? []
       setCapacitaciones(arr)
-    } catch (err) {
-      console.error('Error cargando capacitaciones:', err)
-    } finally {
-      setLoading(false)
-    }
+    } catch (err) { console.error('Error cargando capacitaciones:', err)
+    } finally { setLoading(false) }
     try {
       const { data } = await capacitacionesAPI.getCobertura()
       setCobertura(data)
-    } catch {
-      setCobertura(null)
-    }
+    } catch { setCobertura(null) }
   }
 
   useEffect(() => { cargar() }, [])
@@ -905,7 +1129,6 @@ export default function Capacitaciones() {
 
   return (
     <div className="min-h-full px-4 sm:px-6 lg:px-8 py-6" style={{ backgroundColor: bg }}>
-      {/* Encabezado */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: text }}>Capacitaciones</h1>
@@ -916,11 +1139,7 @@ export default function Capacitaciones() {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${border}` }}>
-            {[
-              { key: 'activas',   label: 'Activas' },
-              { key: 'inactivas', label: 'Inactivas' },
-              { key: 'todas',     label: 'Todas' },
-            ].map(f => (
+            {[{ key: 'activas', label: 'Activas' }, { key: 'inactivas', label: 'Inactivas' }, { key: 'todas', label: 'Todas' }].map(f => (
               <button key={f.key} onClick={() => setFiltro(f.key)}
                 className="px-3 py-1.5 text-xs font-medium transition"
                 style={{ backgroundColor: filtro === f.key ? '#6366F1' : card, color: filtro === f.key ? '#fff' : sub }}>
@@ -936,10 +1155,8 @@ export default function Capacitaciones() {
         </div>
       </div>
 
-      {/* Cobertura */}
       {cobertura && (
-        <div className="rounded-xl p-4 mb-6 flex items-center justify-between gap-4"
-             style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+        <div className="rounded-xl p-4 mb-6 flex items-center justify-between gap-4" style={{ backgroundColor: card, border: `1px solid ${border}` }}>
           <div>
             <p className="text-xs font-medium" style={{ color: sub }}>Cobertura del plan anual</p>
             <p className="text-2xl font-bold mt-1" style={{ color: text }}>{pct}%</p>
@@ -953,16 +1170,13 @@ export default function Capacitaciones() {
         </div>
       )}
 
-      {/* Cards */}
       {loading ? (
         <p className="text-center py-12 text-sm" style={{ color: sub }}>Cargando capacitaciones...</p>
       ) : lista.length === 0 ? (
         <div className="text-center py-16">
           <BookOpen size={40} className="mx-auto mb-3" style={{ color: sub }} />
           <p className="text-sm" style={{ color: sub }}>
-            {filtro === 'activas' ? 'No hay capacitaciones activas.'
-              : filtro === 'inactivas' ? 'No hay capacitaciones inactivas.'
-              : 'No hay capacitaciones registradas.'}
+            {filtro === 'activas' ? 'No hay capacitaciones activas.' : filtro === 'inactivas' ? 'No hay capacitaciones inactivas.' : 'No hay capacitaciones registradas.'}
           </p>
         </div>
       ) : (
