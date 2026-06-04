@@ -155,18 +155,20 @@ export const cargosAPI = {
   crear:  (data) => api.post("/cargos/", data), // { nombre, area_id (UUID) }
 };
 
+
 // ─── Capacitaciones ───────────────────────────────────────────────────────────
 export const capacitacionesAPI = {
   getAll:              ()                   => api.get("/capacitaciones/"),
   crear:               (data)               => api.post("/capacitaciones/", data),
   actualizar:          (id, data)           => api.patch(`/capacitaciones/${id}`, data),
-  // suspender/activar son shortcuts sobre actualizar
   suspender:           (id)                 => api.patch(`/capacitaciones/${id}`, { activo: false }),
   activar:             (id)                 => api.patch(`/capacitaciones/${id}`, { activo: true }),
   getCobertura:        ()                   => api.get("/capacitaciones/cobertura"),
   getSesiones:         (id)                 => api.get(`/capacitaciones/${id}/sesiones`),
   crearSesion:         (data)               => api.post("/capacitaciones/sesiones", data),
   reprogramarSesion:   (sesionId, data)     => api.patch(`/capacitaciones/sesiones/${sesionId}`, data),
+  // ✅ NUEVO — cambiar estado de sesión
+  cambiarEstadoSesion: (sesionId, estado)   => api.patch(`/capacitaciones/sesiones/${sesionId}/estado`, null, { params: { estado } }),
   registrarAsistencia: (data)               => api.post("/capacitaciones/asistencia", data),
   getAsistencia:       (sesionId)           => api.get(`/capacitaciones/sesiones/${sesionId}/asistencia`),
   crearEvaluacion:     (data)               => api.post("/capacitaciones/evaluaciones", data),
