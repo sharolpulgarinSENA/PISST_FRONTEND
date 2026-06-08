@@ -31,19 +31,16 @@ api.interceptors.response.use(
     const esLogin   = original?.url?.includes("/auth/login");
     const esRefresh = original?.url?.includes("/auth/refresh");
 
-    // 403 — cambio de contraseña obligatorio
     if (status === 403 && detalle === "debe_cambiar_password") {
       window.location.href = "/cambiar-password";
       return Promise.reject(error);
     }
 
-    // 503 — base de datos no disponible
     if (status === 503) {
       window.location.href = "/mantenimiento";
       return Promise.reject(error);
     }
 
-    // 401 — intentar refrescar el token
     if (status === 401 && !esLogin && !esRefresh && !original._retry) {
       const refreshToken = sessionStorage.getItem("pisst_refresh_token");
 
@@ -53,7 +50,6 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // Si ya hay un refresco en curso, encolar esta petición
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -89,7 +85,6 @@ api.interceptors.response.use(
       }
     }
 
-    // 401 en login — dejar pasar para que el componente muestre el error
     return Promise.reject(error);
   }
 );
@@ -105,23 +100,27 @@ export const authAPI = {
 
 // ─── Métricas ─────────────────────────────────────────────────────────────────
 export const metricasAPI = {
-  getKpis:      ()              => api.get("/metricas/kpis"),
-  getDashboard: ()              => api.get("/metricas/dashboard-gerencia"),
-  getAlertas:   ()              => api.get("/metricas/alertas"),
-  getReportePdf:   (periodo)   => api.get("/metricas/reporte-pdf",   { params: { periodo }, responseType: "blob" }),
-  getReporteExcel: (periodo)   => api.get("/metricas/reporte-excel", { params: { periodo }, responseType: "blob" }),
+  getKpis:         ()        => api.get("/metricas/kpis"),
+  getDashboard:    ()        => api.get("/metricas/dashboard-gerencia"),
+  getAlertas:      ()        => api.get("/metricas/alertas"),
+  getReportePdf:   (periodo) => api.get("/metricas/reporte-pdf",   { params: { periodo }, responseType: "blob" }),
+  getReporteExcel: (periodo) => api.get("/metricas/reporte-excel", { params: { periodo }, responseType: "blob" }),
 };
 
 // ─── Incidentes ───────────────────────────────────────────────────────────────
 export const incidentesAPI = {
-  getAll:             (skip = 0, limit = 50)  => api.get("/incidentes/", { params: { skip, limit } }),
-  getById:            (id)                    => api.get(`/incidentes/${id}`),
-  create:             (data)                  => api.post("/incidentes/", data),
-  cambiarEstado:      (id, estado)            => api.patch(`/incidentes/${id}/estado`, { estado }),
-  getProgreso:        (id)                    => api.get(`/incidentes/${id}/progreso`),
-  crearInvestigacion: (id, data)              => api.post(`/incidentes/${id}/investigacion`, data),
-  crearAccion:        (id, data)              => api.post(`/incidentes/${id}/acciones`, data),
-  descargarFurat:     (id)                    => api.get(`/incidentes/${id}/furat`, { responseType: "blob" }),
+  getAll:                 (skip = 0, limit = 50) => api.get("/incidentes/", { params: { skip, limit } }),
+  getById:                (id)                   => api.get(`/incidentes/${id}`),
+  create:                 (data)                 => api.post("/incidentes/", data),
+  cambiarEstado:          (id, estado)           => api.patch(`/incidentes/${id}/estado`, { estado }),
+  getProgreso:            (id)                   => api.get(`/incidentes/${id}/progreso`),
+  getInvestigacion:       (id)                   => api.get(`/incidentes/${id}/investigacion`),
+  crearInvestigacion:     (id, data)             => api.post(`/incidentes/${id}/investigacion`, data),
+  actualizarInvestigacion:(id, data)             => api.patch(`/incidentes/${id}/investigacion`, data),
+  getAcciones:            (id)                   => api.get(`/incidentes/${id}/acciones`),
+  crearAccion:            (id, data)             => api.post(`/incidentes/${id}/acciones`, data),
+  actualizarAccion:       (accionId, data)       => api.patch(`/incidentes/acciones/${accionId}`, data), // ✅ AGREGADO
+  descargarFurat:         (id)                   => api.get(`/incidentes/${id}/furat`, { responseType: "blob" }),
 };
 
 // ─── Usuarios ─────────────────────────────────────────────────────────────────
@@ -147,34 +146,31 @@ export const riesgosAPI = {
 export const areasAPI = {
   getAll: () => api.get("/areas/"),
   crear:  (data) => api.post("/areas/", data),
-}
+};
 
 // ─── Cargos ───────────────────────────────────────────────────────────────────
 export const cargosAPI = {
   getAll: () => api.get("/cargos/"),
-  crear:  (data) => api.post("/cargos/", data), // { nombre, area_id (UUID) }
+  crear:  (data) => api.post("/cargos/", data),
 };
-
 
 // ─── Capacitaciones ───────────────────────────────────────────────────────────
 export const capacitacionesAPI = {
-  getAll:              ()                   => api.get("/capacitaciones/"),
-  crear:               (data)               => api.post("/capacitaciones/", data),
-  actualizar:          (id, data)           => api.patch(`/capacitaciones/${id}`, data),
-  suspender:           (id)                 => api.patch(`/capacitaciones/${id}`, { activo: false }),
-  activar:             (id)                 => api.patch(`/capacitaciones/${id}`, { activo: true }),
-  getCobertura:        ()                   => api.get("/capacitaciones/cobertura"),
-  getSesiones:         (id)                 => api.get(`/capacitaciones/${id}/sesiones`),
-  crearSesion:         (data)               => api.post("/capacitaciones/sesiones", data),
-  reprogramarSesion:   (sesionId, data)     => api.patch(`/capacitaciones/sesiones/${sesionId}`, data),
-  // ✅ NUEVO — cambiar estado de sesión
-  cambiarEstadoSesion: (sesionId, estado)   => api.patch(`/capacitaciones/sesiones/${sesionId}/estado`, null, { params: { estado } }),
-  registrarAsistencia: (data)               => api.post("/capacitaciones/asistencia", data),
-  getAsistencia:       (sesionId)           => api.get(`/capacitaciones/sesiones/${sesionId}/asistencia`),
-  crearEvaluacion:     (data)               => api.post("/capacitaciones/evaluaciones", data),
-  responderEvaluacion: (data)               => api.post("/capacitaciones/evaluaciones/responder", data),
-  getCertificado:      (evalId, empId)      =>
-    api.get(`/capacitaciones/evaluaciones/${evalId}/certificado/${empId}`, { responseType: "blob" }),
+  getAll:              ()                 => api.get("/capacitaciones/"),
+  crear:               (data)             => api.post("/capacitaciones/", data),
+  actualizar:          (id, data)         => api.patch(`/capacitaciones/${id}`, data),
+  suspender:           (id)               => api.patch(`/capacitaciones/${id}`, { activo: false }),
+  activar:             (id)               => api.patch(`/capacitaciones/${id}`, { activo: true }),
+  getCobertura:        ()                 => api.get("/capacitaciones/cobertura"),
+  getSesiones:         (id)               => api.get(`/capacitaciones/${id}/sesiones`),
+  crearSesion:         (data)             => api.post("/capacitaciones/sesiones", data),
+  reprogramarSesion:   (sesionId, data)   => api.patch(`/capacitaciones/sesiones/${sesionId}`, data),
+  cambiarEstadoSesion: (sesionId, estado) => api.patch(`/capacitaciones/sesiones/${sesionId}/estado`, null, { params: { estado } }),
+  registrarAsistencia: (data)             => api.post("/capacitaciones/asistencia", data),
+  getAsistencia:       (sesionId)         => api.get(`/capacitaciones/sesiones/${sesionId}/asistencia`),
+  crearEvaluacion:     (data)             => api.post("/capacitaciones/evaluaciones", data),
+  responderEvaluacion: (data)             => api.post("/capacitaciones/evaluaciones/responder", data),
+  getCertificado:      (evalId, empId)    => api.get(`/capacitaciones/evaluaciones/${evalId}/certificado/${empId}`, { responseType: "blob" }),
 };
 
 // ─── Auditorías ───────────────────────────────────────────────────────────────
