@@ -39,8 +39,17 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
+  // Actualiza datos del usuario en sesión (ej: tras editar el perfil)
+  function updateUser(partial) {
+    setUser((prev) => {
+      const updated = { ...prev, ...partial };
+      sessionStorage.setItem("pisst_user", JSON.stringify(updated));
+      return updated;
+    });
+  }
+
   return (
-    <AuthContext.Provider value={{ token, refreshToken, user, login, logout }}>
+    <AuthContext.Provider value={{ token, refreshToken, user, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

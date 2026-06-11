@@ -1,13 +1,161 @@
-import { useState } from 'react'
-import { Search, Moon, Sun, Bell, ChevronDown, User, Settings, LogOut, Menu, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import {
+  Search, Moon, Sun, Bell, ChevronDown, User, Settings, LogOut, Menu, X,
+  AlertOctagon, AlertTriangle, RefreshCw, BookOpen, Calendar, CheckCircle,
+  Clock, XCircle, ShieldAlert, ClipboardList, CheckSquare, FileSearch, FileCheck,
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { metricasAPI, notificacionesAPI } from '../../services/api'
 
-export default function Navbar({ darkMode, setDarkMode, onHamburgerClick, onMenuClick }) {
+const NOTIF_LIMIT = 10
+
+const ICONOS_EVENTO = {
+  reporte_nuevo:                    AlertTriangle,
+  reporte_estado_cambio:            RefreshCw,
+  capacitacion_nueva:               BookOpen,
+  capacitacion_sesion_programada:   Calendar,
+  capacitacion_sesion_realizada:    CheckCircle,
+  capacitacion_sesion_reprogramada: Clock,
+  capacitacion_sesion_cancelada:    XCircle,
+  riesgo_nuevo:                     ShieldAlert,
+  accion_correctiva_nueva:          ClipboardList,
+  accion_correctiva_completada:     CheckSquare,
+  auditoria_nueva:                  FileSearch,
+  auditoria_vencida:                AlertOctagon,
+  hallazgo_nuevo:                   Search,
+  investigacion_completada:         FileCheck,
+}
+
+function normFecha(f) {
+  if (!f) return ''
+  return f.endsWith('Z') || f.includes('+') || /[+-]\d{2}:\d{2}$/.test(f) ? f : f + 'Z'
+}
+
+function tiempoRelativo(fechaStr) {
+  const fecha = new Date(normFecha(fechaStr))
+  const ahora = new Date()
+  const diffMs = ahora - fecha
+  const diffMin = Math.floor(diffMs / 60000)
+  const diffHrs = Math.floor(diffMs / 3600000)
+
+  if (diffMin < 1)  return 'Ahora mismo'
+  if (diffMin < 60) return `Hace ${diffMin} min`
+  if (diffHrs < 24) return `Hace ${diffHrs} h`
+
+  const ayer = new Date(ahora)
+  ayer.setDate(ayer.getDate() - 1)
+  if (fecha.toDateString() === ayer.toDateString()) return 'Ayer'
+
+  return new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota', dateStyle: 'medium',
+  }).format(fecha)
+}
+
+export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMenuClick }) {
   const [dropdown, setDropdown] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+
+  /* ── Usuario ── */
+  const userRef = useRef(null)
+
+  /* ── Notificaciones ── */
+  const notifRef = useRef(null)
+  const [panelOpen, setPanelOpen]       = useState(false)
+  const [alertas, setAlertas]           = useState([])
+  const [totalAlertas, setTotalAlertas] = useState(0)
+  const [eventos, setEventos]           = useState([])
+  const [totalEventos, setTotalEventos] = useState(0)
+  const [offset, setOffset]             = useState(0)
+  const [loadingNotif, setLoadingNotif] = useState(true)
+  const [loadingMore, setLoadingMore]   = useState(false)
+  const [marcandoTodas, setMarcandoTodas] = useState(false)
+
+  useEffect(() => {
+    cargarNotificaciones()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setPanelOpen(false)
+      }
+      if (userRef.current && !userRef.current.contains(e.target)) {
+        setDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  async function cargarNotificaciones() {
+    setLoadingNotif(true)
+    try {
+      const [resAlertas, resFeed] = await Promise.all([
+        metricasAPI.getAlertas(),
+        notificacionesAPI.getFeed(NOTIF_LIMIT, 0),
+      ])
+      setAlertas(resAlertas.data?.alertas || [])
+      setTotalAlertas(resAlertas.data?.total_alertas || 0)
+      setEventos(resFeed.data?.eventos || [])
+      setTotalEventos(resFeed.data?.total || 0)
+      setOffset(0)
+    } catch {
+      // silencioso: el panel de notificaciones no es crítico
+    } finally {
+      setLoadingNotif(false)
+    }
+  }
+
+  async function verMasEventos() {
+    setLoadingMore(true)
+    try {
+      const nuevoOffset = offset + NOTIF_LIMIT
+      const { data } = await notificacionesAPI.getFeed(NOTIF_LIMIT, nuevoOffset)
+      setEventos((prev) => [...prev, ...(data?.eventos || [])])
+      setTotalEventos(data?.total ?? totalEventos)
+      setOffset(nuevoOffset)
+    } catch {
+      // silencioso
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  async function marcarTodasLeidas() {
+    setMarcandoTodas(true)
+    try {
+      await notificacionesAPI.marcarTodasLeidas()
+      setEventos((prev) => prev.map((e) => ({ ...e, leido: true })))
+    } catch {
+      // silencioso
+    } finally {
+      setMarcandoTodas(false)
+    }
+  }
+
+  function manejarClickAlerta(alerta) {
+    setPanelOpen(false)
+    navigate(alerta.url_destino)
+  }
+
+  async function manejarClickEvento(evento) {
+    if (!evento.leido) {
+      try {
+        await notificacionesAPI.marcarLeido(evento.id)
+      } catch {
+        // continuar de todas formas
+      }
+      setEventos((prev) => prev.map((e) => (e.id === evento.id ? { ...e, leido: true } : e)))
+    }
+    setPanelOpen(false)
+    navigate(evento.url_destino)
+  }
+
+  const noLeidos   = eventos.filter((e) => !e.leido).length
+  const badgeCount = totalAlertas + noLeidos
 
   return (
     <div
@@ -162,30 +310,162 @@ export default function Navbar({ darkMode, setDarkMode, onHamburgerClick, onMenu
           {darkMode ? <Sun size={16} /> : <Moon size={16} />}
         </button>
 
-        {/* Notificaciones — siempre visible */}
-        <button className="relative p-1" style={{ color: '#9CA3AF' }}>
-          <Bell size={18} />
-          <span
-            className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-white text-[10px] flex items-center justify-center"
-            style={{ backgroundColor: '#6366F1' }}
+        {/* Notificaciones */}
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => setPanelOpen((v) => !v)}
+            className="relative p-1"
+            style={{ color: '#9CA3AF' }}
+            aria-label="Notificaciones"
           >
-            3
-          </span>
-        </button>
+            <Bell size={18} />
+            {badgeCount > 0 && (
+              <span
+                className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full text-white text-[10px] flex items-center justify-center"
+                style={{ backgroundColor: '#6366F1' }}
+              >
+                {badgeCount > 9 ? '9+' : badgeCount}
+              </span>
+            )}
+          </button>
 
-        {/* 👤 USUARIO — SOLO en desktop completo (lg+) */}
-        <div className="relative hidden lg:block">
+          {panelOpen && (
+            <div
+              className="absolute right-0 top-12 w-[90vw] max-w-sm sm:w-96 max-h-[28rem] flex flex-col rounded-xl shadow-xl z-50 overflow-hidden"
+              style={{
+                backgroundColor: darkMode ? '#111827' : '#FFFFFF',
+                border: `1px solid ${darkMode ? '#1F2937' : '#E5E7EB'}`,
+              }}
+            >
+              {/* Cabecera */}
+              <div
+                className="flex items-center justify-between px-4 py-3 border-b shrink-0"
+                style={{ borderColor: darkMode ? '#1F2937' : '#E5E7EB' }}
+              >
+                <p className="text-sm font-semibold" style={{ color: darkMode ? '#F9FAFB' : '#111827' }}>
+                  Notificaciones
+                </p>
+                <button
+                  onClick={marcarTodasLeidas}
+                  disabled={marcandoTodas || noLeidos === 0}
+                  className="text-xs font-medium hover:underline disabled:opacity-50"
+                  style={{ color: '#6366F1' }}
+                >
+                  Marcar todas como leídas
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1">
+                {loadingNotif ? (
+                  <p className="text-center text-sm py-8" style={{ color: '#9CA3AF' }}>Cargando...</p>
+                ) : (
+                  <>
+                    {/* Sección A — Alertas del sistema */}
+                    {totalAlertas > 0 && (
+                      <div className="border-b" style={{ borderColor: darkMode ? '#1F2937' : '#E5E7EB' }}>
+                        {alertas.map((a, i) => {
+                          const Icon  = a.nivel === 'critico' ? AlertOctagon : AlertTriangle
+                          const color = a.nivel === 'critico' ? '#EF4444' : '#F97316'
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => manejarClickAlerta(a)}
+                              className="w-full flex items-start gap-3 px-4 py-3 text-left transition hover:opacity-80"
+                              style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.05)' }}
+                            >
+                              <Icon size={18} style={{ color }} className="shrink-0 mt-0.5" />
+                              <p className="text-sm font-medium" style={{ color: darkMode ? '#F9FAFB' : '#111827' }}>
+                                {a.mensaje}
+                              </p>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Sección B — Feed de eventos */}
+                    {eventos.length === 0 ? (
+                      <p className="text-center text-sm py-8" style={{ color: '#9CA3AF' }}>
+                        No tienes notificaciones.
+                      </p>
+                    ) : (
+                      eventos.map((ev) => {
+                        const Icon = ICONOS_EVENTO[ev.tipo] || Bell
+                        const esReporteNuevo = ev.tipo === 'reporte_nuevo'
+                        return (
+                          <div
+                            key={ev.id}
+                            onClick={esReporteNuevo ? undefined : () => manejarClickEvento(ev)}
+                            className={`flex items-start gap-3 px-4 py-3 border-b transition ${esReporteNuevo ? '' : 'cursor-pointer hover:opacity-80'}`}
+                            style={{
+                              borderColor: darkMode ? '#1F2937' : '#E5E7EB',
+                              backgroundColor: !ev.leido
+                                ? (darkMode ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.05)')
+                                : 'transparent',
+                            }}
+                          >
+                            <Icon size={18} className="shrink-0 mt-0.5" style={{ color: '#6366F1' }} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium" style={{ color: darkMode ? '#F9FAFB' : '#111827' }}>
+                                {ev.titulo}
+                              </p>
+                              <p className="text-xs mt-0.5 line-clamp-2" style={{ color: '#9CA3AF' }}>
+                                {ev.descripcion}
+                              </p>
+                              <p className="text-[11px] mt-1" style={{ color: '#9CA3AF' }}>
+                                {tiempoRelativo(ev.fecha)}
+                              </p>
+                              {esReporteNuevo && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); manejarClickEvento(ev) }}
+                                  className="mt-2 text-xs font-semibold hover:underline"
+                                  style={{ color: '#6366F1' }}
+                                >
+                                  Ver reporte →
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+
+                    {/* Ver más */}
+                    {eventos.length < totalEventos && (
+                      <div className="flex justify-center py-3">
+                        <button
+                          onClick={verMasEventos}
+                          disabled={loadingMore}
+                          className="text-xs font-semibold hover:underline disabled:opacity-50"
+                          style={{ color: '#6366F1' }}
+                        >
+                          {loadingMore ? 'Cargando...' : 'Ver más'}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 👤 USUARIO — burbuja de perfil (icono en móvil, completa en lg+) */}
+        <div className="relative" ref={userRef}>
           <button
             onClick={() => setDropdown(v => !v)}
             className="flex items-center gap-2"
+            aria-label="Perfil"
           >
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden"
               style={{ backgroundColor: '#6366F1' }}
             >
-              {user?.nombre?.charAt(0).toUpperCase() || 'U'}
+              {user?.foto_url
+                ? <img src={user.foto_url} alt="" className="w-full h-full object-cover" />
+                : (user?.nombre?.charAt(0).toUpperCase() || 'U')}
             </div>
-            <div className="text-left">
+            <div className="text-left hidden lg:block">
               <p className="text-sm font-semibold" style={{ color: darkMode ? '#E5E7EB' : '#111827' }}>
                 {user?.nombre || 'Usuario'}
               </p>
@@ -193,23 +473,47 @@ export default function Navbar({ darkMode, setDarkMode, onHamburgerClick, onMenu
                 {user?.role || ''}
               </p>
             </div>
-            <ChevronDown size={14} style={{ color: '#9CA3AF' }} />
+            <ChevronDown size={14} className="hidden lg:block" style={{ color: '#9CA3AF' }} />
           </button>
 
           {dropdown && (
             <div
-              className="absolute right-0 top-12 w-44 rounded-xl shadow-xl z-50 overflow-hidden"
+              className="absolute right-0 top-12 w-56 max-w-[calc(100vw-1.5rem)] rounded-xl shadow-xl z-50 overflow-hidden"
               style={{
                 backgroundColor: darkMode ? '#111827' : '#FFFFFF',
                 border: `1px solid ${darkMode ? '#1F2937' : '#E5E7EB'}`
               }}
             >
+              {/* Cabecera con datos del usuario — solo visible en móvil/tablet */}
+              <div
+                className="lg:hidden flex items-center gap-3 px-4 py-3 border-b"
+                style={{ borderColor: darkMode ? '#1F2937' : '#E5E7EB' }}
+              >
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 overflow-hidden"
+                  style={{ backgroundColor: '#6366F1' }}
+                >
+                  {user?.foto_url
+                    ? <img src={user.foto_url} alt="" className="w-full h-full object-cover" />
+                    : (user?.nombre?.charAt(0).toUpperCase() || 'U')}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate" style={{ color: darkMode ? '#F9FAFB' : '#111827' }}>
+                    {user?.nombre || 'Usuario'}
+                  </p>
+                  <p className="text-xs capitalize" style={{ color: '#9CA3AF' }}>
+                    {user?.role || ''}
+                  </p>
+                </div>
+              </div>
+
               {[
-                { icon: User, label: 'Perfil' },
-                { icon: Settings, label: 'Configuración' },
-              ].map(({ icon: Icon, label }) => (
+                { icon: User, label: 'Perfil', path: '/perfil' },
+                { icon: Settings, label: 'Configuración', path: null },
+              ].map(({ icon: Icon, label, path }) => (
                 <button
                   key={label}
+                  onClick={() => { setDropdown(false); if (path) navigate(path) }}
                   className="flex items-center gap-3 w-full px-4 py-2.5 text-sm transition hover:opacity-80"
                   style={{ color: darkMode ? '#E5E7EB' : '#374151' }}
                 >

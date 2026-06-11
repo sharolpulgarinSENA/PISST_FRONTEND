@@ -39,6 +39,8 @@ export default function MetricsAccordion({
               className={`grid gap-5 ${
                 metrics.length === 3
                   ? "grid-cols-1 sm:grid-cols-3"
+                  : metrics.length === 5
+                  ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
                   : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
               }`}
             >

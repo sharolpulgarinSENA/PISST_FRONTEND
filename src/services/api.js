@@ -125,10 +125,14 @@ export const incidentesAPI = {
 
 // ─── Usuarios ─────────────────────────────────────────────────────────────────
 export const usuariosAPI = {
-  getAll:  (skip = 0, limit = 50) => api.get("/usuarios/", { params: { skip, limit } }),
-  getById: (id)                   => api.get(`/usuarios/${id}`),
-  create:  (data)                 => api.post("/usuarios/", data),
-  update:  (id, data)             => api.patch(`/usuarios/${id}`, data),
+  getAll:       (skip = 0, limit = 50)   => api.get("/usuarios/", { params: { skip, limit } }),
+  getById:      (id)                     => api.get(`/usuarios/${id}`),
+  create:       (data)                   => api.post("/usuarios/", data),
+  update:       (id, data)               => api.patch(`/usuarios/${id}`, data),
+  getMe:        ()                       => api.get("/usuarios/me"),
+  updateMe:     (data)                   => api.patch("/usuarios/me", data),
+  updateFoto:   (formData)               => api.put("/usuarios/me/foto", formData, { headers: { "Content-Type": "multipart/form-data" } }),
+  getActividad: (limit = 10, offset = 0) => api.get("/usuarios/me/actividad", { params: { limit, offset } }),
 };
 
 // ─── Riesgos ──────────────────────────────────────────────────────────────────
@@ -171,6 +175,21 @@ export const capacitacionesAPI = {
   crearEvaluacion:     (data)             => api.post("/capacitaciones/evaluaciones", data),
   responderEvaluacion: (data)             => api.post("/capacitaciones/evaluaciones/responder", data),
   getCertificado:      (evalId, empId)    => api.get(`/capacitaciones/evaluaciones/${evalId}/certificado/${empId}`, { responseType: "blob" }),
+};
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+export const analyticsAPI = {
+  getIncidentes:      () => api.get("/analytics/incidentes"),
+  getRiesgos:         () => api.get("/analytics/riesgos"),
+  getCapacitaciones:  () => api.get("/analytics/capacitaciones"),
+  getCumplimiento:    () => api.get("/analytics/cumplimiento"),
+};
+
+// ─── Notificaciones ───────────────────────────────────────────────────────────
+export const notificacionesAPI = {
+  getFeed:          (limit = 10, offset = 0) => api.get("/notificaciones/feed", { params: { limit, offset } }),
+  marcarLeido:      (id)                     => api.patch(`/notificaciones/${id}/leido`),
+  marcarTodasLeidas:()                       => api.patch("/notificaciones/leer-todas"),
 };
 
 // ─── Auditorías ───────────────────────────────────────────────────────────────

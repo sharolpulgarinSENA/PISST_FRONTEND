@@ -81,9 +81,11 @@ export default function Sidebar({ open, onClose }) {
               {!collapsed && (
         <div className="mx-2 mb-3 p-3 rounded-xl" style={{ backgroundColor: '#111827' }}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden"
                 style={{ backgroundColor: '#6366F1' }}>
-              {user?.nombre?.charAt(0).toUpperCase() || 'U'}
+              {user?.foto_url
+                ? <img src={user.foto_url} alt="" className="w-full h-full object-cover" />
+                : (user?.nombre?.charAt(0).toUpperCase() || 'U')}
             </div>
             <div>
               <p className="text-white text-sm font-semibold truncate max-w-[120px]">
@@ -165,9 +167,11 @@ export default function Sidebar({ open, onClose }) {
             {/* Perfil + cerrar sesión */}
             <div className="p-4 border-t" style={{ borderColor: '#1F2937' }}>
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden"
                      style={{ backgroundColor: '#6366F1' }}>
-                  {user?.nombre?.charAt(0).toUpperCase() || 'U'}
+                  {user?.foto_url
+                    ? <img src={user.foto_url} alt="" className="w-full h-full object-cover" />
+                    : (user?.nombre?.charAt(0).toUpperCase() || 'U')}
                 </div>
                 <div>
                   <p className="text-white text-sm font-semibold">{user?.nombre || 'Usuario'}</p>

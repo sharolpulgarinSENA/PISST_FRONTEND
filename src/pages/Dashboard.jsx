@@ -1,46 +1,41 @@
 import { useState, useEffect } from 'react'
 import {
-  AlertTriangle, Users, ClipboardList, Shield,
+  AlertTriangle, Users, Shield,
   ShieldCheck, FileText, GraduationCap, Clock,
-  TrendingUp, AlertCircle,
+  TrendingUp, AlertCircle, CheckCircle2, FileSearch,
 } from 'lucide-react'
 
 import KPICard from '../components/dashboard/KPICard'
 import MetricsAccordion from '../components/dashboard/MetricsAccordion'
-import AnnualChart from '../components/dashboard/AnnualChart'
+import OverviewChart from '../components/dashboard/OverviewChart'
+import AnalyticsSummary from '../components/dashboard/AnalyticsSummary'
 import ReportDocumentation from '../components/dashboard/ReportDocumentation'
-import { metricasAPI } from '../services/api'
+import { metricasAPI, analyticsAPI } from '../services/api'
 import { useOutletContext } from 'react-router-dom'
-
-const chartData = [
-  { mes: 'Ene', accidentes: 12, trabajadores: 42, dias: 2 },
-  { mes: 'Feb', accidentes: 14, trabajadores: 45, dias: 3 },
-  { mes: 'Mar', accidentes: 18, trabajadores: 54, dias: 6 },
-  { mes: 'Abr', accidentes: 15, trabajadores: 48, dias: 4 },
-  { mes: 'May', accidentes: 14, trabajadores: 46, dias: 3 },
-  { mes: 'Jun', accidentes: 16, trabajadores: 49, dias: 5 },
-  { mes: 'Jul', accidentes: 17, trabajadores: 54, dias: 4 },
-  { mes: 'Ago', accidentes: 15, trabajadores: 49, dias: 5 },
-  { mes: 'Sep', accidentes: 13, trabajadores: 44, dias: 3 },
-  { mes: 'Oct', accidentes: 14, trabajadores: 47, dias: 4 },
-  { mes: 'Nov', accidentes: 15, trabajadores: 52, dias: 2 },
-  { mes: 'Dic', accidentes: 13, trabajadores: 50, dias: 2 },
-]
 
 export default function Dashboard() {
   const { darkMode } = useOutletContext()
   const [dashboard, setDashboard] = useState(null)
-  const [kpis,      setKpis]      = useState(null)
-  const [loading,   setLoading]   = useState(true)
+  const [analyticsIncidentes, setAnalyticsIncidentes] = useState(null)
+  const [analyticsRiesgos, setAnalyticsRiesgos] = useState(null)
+  const [analyticsCapacitaciones, setAnalyticsCapacitaciones] = useState(null)
+  const [analyticsCumplimiento, setAnalyticsCumplimiento] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       metricasAPI.getDashboard(),
-      metricasAPI.getKpis(),
+      analyticsAPI.getIncidentes(),
+      analyticsAPI.getRiesgos(),
+      analyticsAPI.getCapacitaciones(),
+      analyticsAPI.getCumplimiento(),
     ])
-      .then(([dashRes, kpisRes]) => {
+      .then(([dashRes, incRes, riesgosRes, capRes, cumpRes]) => {
         setDashboard(dashRes.data)
-        setKpis(kpisRes.data)
+        setAnalyticsIncidentes(incRes.data)
+        setAnalyticsRiesgos(riesgosRes.data)
+        setAnalyticsCapacitaciones(capRes.data)
+        setAnalyticsCumplimiento(cumpRes.data)
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -48,22 +43,24 @@ export default function Dashboard() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
-      <p style={{ color: '#9CA3AF' }}>Cargando dashboard...</p>
+      <p style={{ color: darkMode ? '#9CA3AF' : '#6B7280' }}>Cargando dashboard...</p>
     </div>
   )
+
+  const kpis = dashboard?.kpis
 
   const kpiCards = [
     {
       id: 'incidentes',
-      label: 'Reportes activos',
-      value: dashboard?.incidentes_activos ?? 0,
-      delta: `${dashboard?.incidentes_ultimo_mes ?? 0} este mes`,
+      label: 'Reportes (total / activos)',
+      value: analyticsIncidentes?.total_incidentes ?? 0,
+      delta: `${dashboard?.incidentes_activos ?? 0} activos`,
       deltaPositive: false,
       Icon: AlertTriangle,
       iconBg: 'bg-indigo-100 dark:bg-indigo-500/10',
       iconColor: 'text-indigo-600 dark:text-indigo-400',
       trendColor: '#6366F1',
-      trend: [10, 11, 9, 12, 10, 13, dashboard?.incidentes_activos ?? 0],
+      trend: [10, 11, 9, 12, 10, 13, analyticsIncidentes?.total_incidentes ?? 0],
     },
     {
       id: 'empleados',
@@ -103,50 +100,72 @@ export default function Dashboard() {
     },
   ]
 
+  const overviewData = [
+    { name: 'Reportes activos', valor: dashboard?.incidentes_activos ?? 0 },
+    { name: 'Acciones vencidas', valor: dashboard?.acciones_vencidas ?? 0 },
+    { name: 'Capacitaciones', valor: dashboard?.total_capacitaciones ?? 0 },
+    { name: 'Peligros identificados', valor: analyticsRiesgos?.total_peligros ?? 0 },
+    { name: 'Accidentes totales', valor: kpis?.total_accidentes ?? 0 },
+    { name: 'Días perdidos', valor: kpis?.dias_perdidos ?? 0 },
+  ]
+
+  const desglose = analyticsCumplimiento?.desglose
+
   const complianceMetrics = [
     {
       id: 'cumplimiento',
-      label: 'Cumplimiento general',
-      value: `${dashboard?.cumplimiento_sgsst ?? 0}%`,
-      progress: dashboard?.cumplimiento_sgsst ?? 0,
-      delta: 'SG-SST',
+      label: 'Score SG-SST',
+      value: `${analyticsCumplimiento?.score_total ?? 0}%`,
+      progress: analyticsCumplimiento?.score_total ?? 0,
+      delta: 'General',
       deltaPositive: true,
       Icon: ShieldCheck,
       iconColor: 'text-indigo-600 dark:text-indigo-400',
-      barColor: 'bg-indigo-500',
+      barColor: 'bg-indigo-500 dark:bg-indigo-400',
     },
     {
-      id: 'incidentes_mes',
-      label: 'Reportes último mes',
-      value: String(dashboard?.incidentes_ultimo_mes ?? 0),
-      progress: Math.min((dashboard?.incidentes_ultimo_mes ?? 0) * 10, 100),
-      delta: 'Este mes',
-      deltaPositive: (dashboard?.incidentes_ultimo_mes ?? 0) === 0,
-      Icon: FileText,
+      id: 'incidentes_investigados',
+      label: 'Reportes investigados',
+      value: `${desglose?.incidentes_investigados ?? 0}%`,
+      progress: desglose?.incidentes_investigados ?? 0,
+      delta: 'Del total',
+      deltaPositive: (desglose?.incidentes_investigados ?? 0) >= 80,
+      Icon: FileSearch,
       iconColor: 'text-sky-600 dark:text-sky-400',
-      barColor: 'bg-sky-500',
+      barColor: 'bg-sky-500 dark:bg-sky-400',
     },
     {
-      id: 'capacitaciones',
-      label: 'Capacitaciones',
-      value: String(dashboard?.total_capacitaciones ?? 0),
-      progress: Math.min((dashboard?.total_capacitaciones ?? 0) * 20, 100),
-      delta: 'Total registradas',
-      deltaPositive: true,
+      id: 'peligros_con_control',
+      label: 'Peligros con control',
+      value: `${desglose?.peligros_con_control ?? 0}%`,
+      progress: desglose?.peligros_con_control ?? 0,
+      delta: 'Implementado',
+      deltaPositive: (desglose?.peligros_con_control ?? 0) >= 80,
+      Icon: ShieldCheck,
+      iconColor: 'text-amber-600 dark:text-amber-400',
+      barColor: 'bg-amber-500 dark:bg-amber-400',
+    },
+    {
+      id: 'capacitaciones_realizadas',
+      label: 'Capacitaciones realizadas',
+      value: `${desglose?.capacitaciones_realizadas ?? 0}%`,
+      progress: desglose?.capacitaciones_realizadas ?? 0,
+      delta: 'Del plan anual',
+      deltaPositive: (desglose?.capacitaciones_realizadas ?? 0) >= 80,
       Icon: GraduationCap,
       iconColor: 'text-emerald-600 dark:text-emerald-400',
-      barColor: 'bg-emerald-500',
+      barColor: 'bg-emerald-500 dark:bg-emerald-400',
     },
     {
-      id: 'acciones',
-      label: 'Acciones vencidas',
-      value: String(dashboard?.acciones_vencidas ?? 0),
-      progress: Math.min((dashboard?.acciones_vencidas ?? 0) * 20, 100),
-      delta: 'Sin resolver',
-      deltaPositive: dashboard?.acciones_vencidas === 0,
-      Icon: Clock,
+      id: 'nc_cerradas',
+      label: 'No conformidades cerradas',
+      value: `${desglose?.no_conformidades_cerradas ?? 0}%`,
+      progress: desglose?.no_conformidades_cerradas ?? 0,
+      delta: 'Del total',
+      deltaPositive: (desglose?.no_conformidades_cerradas ?? 0) >= 80,
+      Icon: CheckCircle2,
       iconColor: 'text-rose-600 dark:text-rose-400',
-      barColor: 'bg-rose-500',
+      barColor: 'bg-rose-500 dark:bg-rose-400',
     },
   ]
 
@@ -195,7 +214,7 @@ export default function Dashboard() {
         <div className="xl:col-span-2">
           <MetricsAccordion
             darkMode={darkMode}
-            title="Métricas Clave de Cumplimiento"
+            title="Cumplimiento SG-SST"
             metrics={complianceMetrics}
             withProgress
             defaultOpen
@@ -211,7 +230,14 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <AnnualChart darkMode={darkMode} data={chartData} />
+      <AnalyticsSummary
+        darkMode={darkMode}
+        incidentes={analyticsIncidentes}
+        riesgos={analyticsRiesgos}
+        capacitaciones={analyticsCapacitaciones}
+      />
+
+      <OverviewChart darkMode={darkMode} data={overviewData} />
 
       <ReportDocumentation darkMode={darkMode} />
     </main>

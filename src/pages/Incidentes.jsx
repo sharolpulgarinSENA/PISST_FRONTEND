@@ -710,7 +710,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { Plus, X, Download, AlertTriangle, CheckCircle, Pencil } from 'lucide-react'
+import { Plus, X, Download, AlertTriangle, CheckCircle, Pencil, FileText, Search, ClipboardList } from 'lucide-react'
 import { incidentesAPI } from '../services/api'
 
 /* ── Extrae el UUID del usuario desde el JWT almacenado ──
@@ -866,7 +866,7 @@ function ModalNuevoReporte({ darkMode, onClose, onCreado }) {
 
         <div className="px-6 py-5 space-y-4">
           <BannerError msg={bannerErr} />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Tipo de reporte *</label>
               <select value={form.tipo} onChange={e => set('tipo', e.target.value)}
@@ -1128,9 +1128,9 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
           .format(new Date(normFecha(f))) : '—'
 
   const tabs = [
-    { id: 'info',          label: '📑 Información' },
-    { id: 'investigacion', label: '🔍 Investigación' },
-    { id: 'acciones',      label: '📝 Acciones correctivas' },
+    { id: 'info',          label: 'Información',        Icon: FileText      },
+    { id: 'investigacion', label: 'Investigación',      Icon: Search        },
+    { id: 'acciones',      label: 'Acciones correctivas', Icon: ClipboardList },
   ]
 
   return (
@@ -1156,12 +1156,12 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
         <div className="flex border-b px-6" style={{ borderColor: border }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => { setTab(t.id); clearBanners(); cancelarEdicion() }}
-                    className="px-4 py-3 text-sm font-medium border-b-2 transition"
+                    className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition"
                     style={{
                       borderColor: tab === t.id ? '#6366F1' : 'transparent',
                       color:       tab === t.id ? '#6366F1' : sub,
                     }}>
-              {t.label}
+              <t.Icon className="w-4 h-4 shrink-0" />{t.label}
             </button>
           ))}
         </div>
@@ -1174,7 +1174,7 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
           {/* ── TAB INFO ── */}
           {tab === 'info' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="rounded-lg p-3" style={{ backgroundColor: input }}>
                   <p className="text-xs mb-1" style={{ color: sub }}>Lugar</p>
                   <p className="text-sm font-medium" style={{ color: text }}>{reporte.lugar}</p>
@@ -1193,7 +1193,7 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
               {reporte.lesion && (
                 <div className="rounded-lg p-3" style={{ backgroundColor: input }}>
                   <p className="text-xs font-medium mb-2" style={{ color: sub }}>Lesión registrada</p>
-                  <div className="grid grid-cols-3 gap-2 text-sm" style={{ color: text }}>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm" style={{ color: text }}>
                     <div><span className="text-xs block" style={{ color: sub }}>Tipo</span>{reporte.lesion.tipo_lesion}</div>
                     <div><span className="text-xs block" style={{ color: sub }}>Parte afectada</span>{reporte.lesion.parte_afectada}</div>
                     <div><span className="text-xs block" style={{ color: sub }}>Incapacidad</span>{reporte.lesion.incapacidad_dias} días</div>
@@ -1327,7 +1327,7 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
                                   className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none"
                                   style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="text-xs mb-1 block" style={{ color: sub }}>Prioridad</label>
                             <select value={formEdicion.prioridad} onChange={e => setE('prioridad', e.target.value)}
@@ -1351,7 +1351,7 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="text-xs mb-1 block" style={{ color: sub }}>Fecha límite</label>
                             <input type="date" value={formEdicion.fecha_limite}
@@ -1395,7 +1395,7 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
                             onChange={e => setA('descripcion', e.target.value)}
                             className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none"
                             style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <select value={accion.prioridad} onChange={e => setA('prioridad', e.target.value)}
                             className="rounded-lg px-3 py-2 text-sm outline-none"
                             style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }}>
@@ -1451,6 +1451,16 @@ export default function Incidentes() {
     if (searchParams.get('nuevo') === 'true') {
       setModalNuevo(true)
       setSearchParams({})
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    const reporteId = searchParams.get('reporte')
+    if (reporteId) {
+      incidentesAPI.getById(reporteId)
+        .then(r => setModalDetalle(r.data))
+        .catch(console.error)
+        .finally(() => setSearchParams({}))
     }
   }, [searchParams])
 

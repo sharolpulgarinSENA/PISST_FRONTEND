@@ -1,21 +1,50 @@
 import { useState } from "react";
-import { ChevronDown, FolderOpen, Download, FileText } from "lucide-react";
+import { ChevronDown, FolderOpen, Download, Loader2, AlertCircle } from "lucide-react";
+import { metricasAPI } from "../../services/api";
 
 const reports = [
-  { id: "pdf-mes", label: "PDF mensual", type: "PDF", color: "bg-rose-500" },
-  { id: "xls-mes", label: "Excel mensual", type: "Excel", color: "bg-emerald-500" },
-  { id: "pdf-tri", label: "PDF trimestral", type: "PDF", color: "bg-rose-500" },
-  { id: "xls-tri", label: "Excel trimestral", type: "Excel", color: "bg-emerald-500" },
-  { id: "pdf-anu", label: "PDF anual", type: "PDF", color: "bg-rose-500" },
-  { id: "xls-anu", label: "Excel anual", type: "Excel", color: "bg-emerald-500" },
+  { id: "pdf-mensual",    label: "PDF mensual",     type: "PDF",   periodo: "mensual",    color: "bg-rose-500" },
+  { id: "xls-mensual",    label: "Excel mensual",   type: "Excel", periodo: "mensual",    color: "bg-emerald-500" },
+  { id: "pdf-trimestral", label: "PDF trimestral",  type: "PDF",   periodo: "trimestral", color: "bg-rose-500" },
+  { id: "xls-trimestral", label: "Excel trimestral",type: "Excel", periodo: "trimestral", color: "bg-emerald-500" },
+  { id: "pdf-anual",      label: "PDF anual",       type: "PDF",   periodo: "anual",      color: "bg-rose-500" },
+  { id: "xls-anual",      label: "Excel anual",     type: "Excel", periodo: "anual",      color: "bg-emerald-500" },
 ];
+
+const MIME = {
+  PDF:   "application/pdf",
+  Excel: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+
+const EXT = {
+  PDF:   "pdf",
+  Excel: "xlsx",
+};
 
 export default function ReportsDocumentation() {
   const [open, setOpen] = useState(true);
+  const [downloadingId, setDownloadingId] = useState(null);
+  const [error, setError] = useState(null);
 
-  const handleDownload = (id) => {
-    // Hook para conectar al backend
-    console.log("Descargar:", id);
+  const handleDownload = async (report) => {
+    setError(null);
+    setDownloadingId(report.id);
+    try {
+      const { data } = report.type === "PDF"
+        ? await metricasAPI.getReportePdf(report.periodo)
+        : await metricasAPI.getReporteExcel(report.periodo);
+
+      const url = URL.createObjectURL(new Blob([data], { type: MIME[report.type] }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte_pisst_${report.periodo}.${EXT[report.type]}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError(`No se pudo descargar el reporte "${report.label}". Intenta de nuevo.`);
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   return (
@@ -44,31 +73,46 @@ export default function ReportsDocumentation() {
       >
         <div className="overflow-hidden">
           <div className="px-5 pb-5">
+            {error && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg text-sm border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {error}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-              {reports.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => handleDownload(r.id)}
-                  className="group flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-800 rounded-xl hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition"
-                >
-                  <div
-                    className={`flex items-center justify-center w-10 h-10 ${r.color} rounded-lg shrink-0`}
+              {reports.map((r) => {
+                const isDownloading = downloadingId === r.id;
+                return (
+                  <button
+                    key={r.id}
+                    onClick={() => handleDownload(r)}
+                    disabled={downloadingId !== null}
+                    className="group flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-800 rounded-xl hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <span className="text-[10px] font-bold text-white">
-                      {r.type === "PDF" ? "PDF" : "Exel"}
-                    </span>
-                  </div>
-                  <div className="flex-1 text-left min-w-0">
-                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                      {r.label}
+                    <div
+                      className={`flex items-center justify-center w-10 h-10 ${r.color} rounded-lg shrink-0`}
+                    >
+                      <span className="text-[10px] font-bold text-white">
+                        {r.type === "PDF" ? "PDF" : "XLS"}
+                      </span>
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Descargar
+                    <div className="flex-1 text-left min-w-0">
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {r.label}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {isDownloading ? "Descargando..." : "Descargar"}
+                      </div>
                     </div>
-                  </div>
-                  <Download className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition shrink-0" />
-                </button>
-              ))}
+                    {isDownloading ? (
+                      <Loader2 className="w-4 h-4 text-indigo-500 animate-spin shrink-0" />
+                    ) : (
+                      <Download className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

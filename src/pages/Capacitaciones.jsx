@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import {
   Plus, X, BookOpen, ChevronDown, Check, Power, PowerOff, Calendar, MapPin,
   Users, CheckCircle, XCircle, AlertCircle, RotateCcw, Ban,
-  ClipboardList, Trash2, GraduationCap
+  ClipboardList, Trash2, GraduationCap, Info, Pencil, Clock
 } from 'lucide-react'
 import { capacitacionesAPI, areasAPI, usuariosAPI } from '../services/api'
 
@@ -424,8 +424,8 @@ function PanelEvaluaciones({ sesion, theme }) {
         )}
 
         {/* Título + puntaje */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="sm:col-span-2">
             <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Título de la evaluación *</label>
             <input type="text" value={titulo} onChange={e => setTitulo(e.target.value)}
               placeholder="Ej: Evaluación final EPP"
@@ -859,9 +859,9 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
 
   const esActiva = capacitacion.activo
   const TABS = [
-    { id: 'sesiones', label: '📅 Sesiones'   },
-    { id: 'info',     label: 'ℹ️ Información' },
-    { id: 'editar',   label: '✏️ Editar'      },
+    { id: 'sesiones', label: 'Sesiones',    Icon: Calendar },
+    { id: 'info',     label: 'Información', Icon: Info     },
+    { id: 'editar',   label: 'Editar',      Icon: Pencil   },
   ]
 
   // ── Vista asistencia ──
@@ -943,9 +943,9 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
           <div className="flex border-b px-6" style={{ borderColor: border }}>
             {TABS.map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setBanner('') }}
-                className="px-4 py-3 text-sm font-medium border-b-2 transition"
+                className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition"
                 style={{ borderColor: tab === t.id ? '#6366F1' : 'transparent', color: tab === t.id ? '#6366F1' : sub }}>
-                {t.label}
+                <t.Icon className="w-4 h-4 shrink-0" />{t.label}
               </button>
             ))}
           </div>
@@ -973,7 +973,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
                 {/* Nueva sesión */}
                 <div className="rounded-xl p-4 space-y-3 mt-2" style={{ backgroundColor: input, border: `1px solid ${border}` }}>
                   <p className="text-sm font-semibold" style={{ color: text }}>Nueva sesión</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs mb-1 block" style={{ color: sub }}>Fecha y hora *</label>
                       <input type="datetime-local" value={sesionForm.fecha}
@@ -1137,7 +1137,7 @@ export default function Capacitaciones() {
             {filtro === 'activas' ? 'activos' : filtro === 'inactivas' ? 'inactivos' : 'en total'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap justify-end">
           <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${border}` }}>
             {[{ key: 'activas', label: 'Activas' }, { key: 'inactivas', label: 'Inactivas' }, { key: 'todas', label: 'Todas' }].map(f => (
               <button key={f.key} onClick={() => setFiltro(f.key)}
@@ -1202,7 +1202,7 @@ export default function Capacitaciones() {
                 </div>
               )}
               <div className="flex items-center justify-between mt-auto pt-1">
-                <p className="text-xs" style={{ color: sub }}>⏱ {c.duracion_horas}h</p>
+                <p className="text-xs flex items-center gap-1" style={{ color: sub }}><Clock size={11} />{c.duracion_horas}h</p>
                 <button onClick={() => setModalDetalle(c)} className="text-xs font-semibold hover:underline" style={{ color: '#6366F1' }}>
                   Ver detalle →
                 </button>

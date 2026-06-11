@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Plus, X, UserCheck, UserX, Pencil, Building2, Briefcase, ChevronDown } from 'lucide-react'
+import { Plus, X, UserCheck, UserX, Pencil, Building2, Briefcase, ChevronDown, AlertTriangle } from 'lucide-react'
 import { usuariosAPI, areasAPI, cargosAPI } from '../services/api'
 
 // SST solo puede crear empleados (backend bloquea sst/gerencia/admin con 403)
@@ -158,12 +158,12 @@ function ModalGestionarOrg({ darkMode, onClose, onCambiado }) {
         </div>
 
         <div className="flex border-b px-6" style={{ borderColor: border }}>
-          {[{ id: 'areas', label: '🏢 Áreas' }, { id: 'cargos', label: '💼 Cargos' }].map(t => (
+          {[{ id: 'areas', label: 'Áreas', Icon: Building2 }, { id: 'cargos', label: 'Cargos', Icon: Briefcase }].map(t => (
             <button key={t.id}
                     onClick={() => { setTab(t.id); setBanner({ type: '', msg: '' }) }}
-                    className="px-4 py-3 text-sm font-medium border-b-2 transition"
+                    className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition"
                     style={{ borderColor: tab === t.id ? '#6366F1' : 'transparent', color: tab === t.id ? '#6366F1' : sub }}>
-              {t.label}
+              <t.Icon className="w-4 h-4 shrink-0" />{t.label}
             </button>
           ))}
         </div>
@@ -228,7 +228,8 @@ function ModalGestionarOrg({ darkMode, onClose, onCambiado }) {
                 </div>
                 {areas.length === 0 && !cargando && (
                   <p className="text-xs mt-1" style={{ color: '#F59E0B' }}>
-                    ⚠️ Primero crea un área antes de agregar cargos.
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 inline mr-1" />
+                    Primero crea un área antes de agregar cargos.
                   </p>
                 )}
               </div>

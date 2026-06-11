@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Plus, X, ClipboardList } from 'lucide-react'
+import { Plus, X, ClipboardList, FileText, Search, Lightbulb, Pencil } from 'lucide-react'
 import { auditoriasAPI } from '../services/api'
+
+function getUsuarioId() {
+  try {
+    const token = sessionStorage.getItem('pisst_token')
+    if (!token) return null
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return payload.sub || null
+  } catch { return null }
+}
 
 const ESTADOS = ['planificada', 'en_ejecucion', 'completada']
 const ESTADO_COLOR = {
@@ -17,6 +26,24 @@ const CLASIFICACION_COLOR = {
   no_conformidad_menor:    'bg-yellow-500/20 text-yellow-300',
   no_conformidad_mayor:    'bg-red-500/20 text-red-300',
   observacion:             'bg-blue-500/20 text-blue-300',
+}
+const NC_ESTADO_COLOR = {
+  abierta:    'bg-red-500/20 text-red-300',
+  en_proceso: 'bg-yellow-500/20 text-yellow-300',
+  cerrada:    'bg-green-500/20 text-green-300',
+}
+const NC_ESTADO_LABEL = {
+  abierta: 'Abierta', en_proceso: 'En proceso', cerrada: 'Cerrada',
+}
+
+function normFecha(f) {
+  if (!f) return ''
+  return f.endsWith('Z') || f.includes('+') || /[+-]\d{2}:\d{2}$/.test(f) ? f : f + 'Z'
+}
+
+function fmtFecha(f, opts = { dateStyle: 'medium' }) {
+  if (!f) return '—'
+  return new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', ...opts }).format(new Date(normFecha(f)))
 }
 
 function Badge({ text, colorClass }) {
@@ -119,8 +146,10 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
   const [hallazgoForm, setHallazgoForm] = useState({
     descripcion: '', clasificacion: '', evidencia: '', recomendacion: ''
   })
-  const [ncForm, setNcForm]   = useState({ descripcion: '', fecha_limite: '' })
+  const [ncForm, setNcForm]     = useState({ descripcion: '', fecha_limite: '' })
   const [ncTarget, setNcTarget] = useState(null)
+  const [editingNcId, setEditingNcId]     = useState(null)
+  const [editNcForm, setEditNcForm]       = useState({ estado: '', evidencia_cierre: '' })
 
   useEffect(() => {
     Promise.all([
@@ -163,18 +192,27 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
     } finally { setLoading(false) }
   }
 
+  const recargarHallazgos = async () => {
+    const r = await auditoriasAPI.getHallazgos(auditoria.id)
+    setHallazgos(r.data)
+  }
+
   const guardarNC = async () => {
     if (!ncForm.descripcion || !ncForm.fecha_limite) {
       setBanner('Por favor, diligencia todos los campos obligatorios para continuar.')
       return
     }
+    const responsable_id = getUsuarioId()
+    if (!responsable_id) { setBanner('No se pudo obtener el usuario. Intenta recargar la sesión.'); return }
     setBanner('')
     setLoading(true)
     try {
       await auditoriasAPI.crearNC(ncTarget, {
-        descripcion:  ncForm.descripcion,
-        fecha_limite: new Date(ncForm.fecha_limite).toISOString(),
+        descripcion:    ncForm.descripcion,
+        fecha_limite:   ncForm.fecha_limite + 'T00:00:00-05:00',
+        responsable_id,
       })
+      await recargarHallazgos()
       setNcTarget(null)
       setNcForm({ descripcion: '', fecha_limite: '' })
     } catch (err) {
@@ -182,9 +220,24 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
     } finally { setLoading(false) }
   }
 
+  const guardarEdicionNC = async () => {
+    setLoading(true)
+    try {
+      await auditoriasAPI.actualizarNC(editingNcId, {
+        estado:           editNcForm.estado           || undefined,
+        evidencia_cierre: editNcForm.evidencia_cierre || undefined,
+      })
+      await recargarHallazgos()
+      setEditingNcId(null)
+      setBanner('')
+    } catch (err) {
+      setBanner(err.response?.data?.detail || 'Error al actualizar NC.')
+    } finally { setLoading(false) }
+  }
+
   const tabs = [
-    { id: 'info',      label: '📑 Información' },
-    { id: 'hallazgos', label: '🔍 Hallazgos' },
+    { id: 'info',      label: 'Información', Icon: FileText },
+    { id: 'hallazgos', label: 'Hallazgos',   Icon: Search   },
   ]
 
   return (
@@ -196,7 +249,7 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
           <div>
             <h2 className="font-bold text-lg" style={{ color: text }}>
-              Auditoría — {new Date(auditoria.fecha_programada).toLocaleDateString('es-CO')}
+              Auditoría — {fmtFecha(auditoria.fecha_programada)}
             </h2>
             <p className="text-xs mt-0.5" style={{ color: sub }}>
               {auditoria.objetivos || 'Sin objetivos registrados'}
@@ -208,9 +261,9 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
         <div className="flex border-b px-6" style={{ borderColor: border }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => { setTab(t.id); setBanner('') }}
-                    className="px-4 py-3 text-sm font-medium border-b-2 transition"
+                    className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition"
                     style={{ borderColor: tab === t.id ? '#6366F1' : 'transparent', color: tab === t.id ? '#6366F1' : sub }}>
-              {t.label}
+              <t.Icon className="w-4 h-4 shrink-0" />{t.label}
             </button>
           ))}
         </div>
@@ -221,11 +274,11 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
           {/* ── TAB INFO ── */}
           {tab === 'info' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="rounded-lg p-3" style={{ backgroundColor: input }}>
                   <p className="text-xs mb-1" style={{ color: sub }}>Fecha programada</p>
                   <p className="text-sm font-medium" style={{ color: text }}>
-                    {new Date(auditoria.fecha_programada).toLocaleDateString('es-CO')}
+                    {fmtFecha(auditoria.fecha_programada)}
                   </p>
                 </div>
                 <div className="rounded-lg p-3" style={{ backgroundColor: input }}>
@@ -280,43 +333,113 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
                     <Badge text={h.clasificacion} colorClass={CLASIFICACION_COLOR[h.clasificacion] || 'bg-gray-500/20 text-gray-300'} />
                   </div>
                   {h.recomendacion && (
-                    <p className="text-xs" style={{ color: sub }}>💡 {h.recomendacion}</p>
+                    <p className="flex items-center gap-1 text-xs" style={{ color: sub }}>
+                    <Lightbulb className="w-3 h-3 shrink-0" />{h.recomendacion}
+                  </p>
                   )}
+
+                  {/* NCs existentes del hallazgo */}
+                  {h.no_conformidades?.length > 0 && (
+                    <div className="mt-2 space-y-2 pl-2 border-l-2" style={{ borderColor: '#6366F1' }}>
+                      {h.no_conformidades.map(nc => (
+                        <div key={nc.id} className="rounded-lg p-3"
+                             style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+                          {editingNcId === nc.id ? (
+                            <div className="space-y-2">
+                              <select value={editNcForm.estado}
+                                      onChange={e => setEditNcForm(f => ({ ...f, estado: e.target.value }))}
+                                      className="w-full rounded-lg px-3 py-1.5 text-xs outline-none"
+                                      style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }}>
+                                <option value="">Estado...</option>
+                                <option value="abierta">Abierta</option>
+                                <option value="en_proceso">En proceso</option>
+                                <option value="cerrada">Cerrada</option>
+                              </select>
+                              <input type="text" placeholder="Evidencia de cierre (opcional)"
+                                     value={editNcForm.evidencia_cierre}
+                                     onChange={e => setEditNcForm(f => ({ ...f, evidencia_cierre: e.target.value }))}
+                                     className="w-full rounded-lg px-3 py-1.5 text-xs outline-none"
+                                     style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }} />
+                              <div className="flex gap-2">
+                                <button onClick={guardarEdicionNC} disabled={loading}
+                                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
+                                        style={{ backgroundColor: '#6366F1' }}>
+                                  {loading ? 'Guardando...' : 'Guardar'}
+                                </button>
+                                <button onClick={() => setEditingNcId(null)}
+                                        className="px-3 py-1.5 rounded-lg text-xs" style={{ color: sub }}>
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium" style={{ color: text }}>{nc.descripcion}</p>
+                                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                  <Badge
+                                    text={NC_ESTADO_LABEL[nc.estado] || nc.estado || 'Abierta'}
+                                    colorClass={NC_ESTADO_COLOR[nc.estado] || NC_ESTADO_COLOR.abierta}
+                                  />
+                                  <span className="text-xs" style={{ color: sub }}>
+                                    Límite: {fmtFecha(nc.fecha_limite, { dateStyle: 'short' })}
+                                  </span>
+                                </div>
+                                {nc.evidencia_cierre && (
+                                  <p className="text-xs mt-1 truncate" style={{ color: sub }}>
+                                    Evidencia: {nc.evidencia_cierre}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => { setEditingNcId(nc.id); setEditNcForm({ estado: nc.estado || '', evidencia_cierre: nc.evidencia_cierre || '' }) }}
+                                className="p-1.5 rounded-lg shrink-0 hover:opacity-70 transition"
+                                style={{ backgroundColor: card, border: `1px solid ${border}` }}
+                                title="Editar NC"
+                              >
+                                <Pencil size={12} style={{ color: sub }} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {(h.clasificacion === 'no_conformidad_menor' || h.clasificacion === 'no_conformidad_mayor') && (
-                    <button onClick={() => setNcTarget(h.id)}
-                            className="text-xs font-semibold hover:underline"
-                            style={{ color: '#6366F1' }}>
-                      + Crear No Conformidad
-                    </button>
+                    ncTarget === h.id ? (
+                      <div className="rounded-xl p-3 space-y-2 border-2 mt-1" style={{ borderColor: '#6366F1', backgroundColor: card }}>
+                        <p className="text-xs font-semibold" style={{ color: text }}>Nueva No Conformidad</p>
+                        <textarea rows={2} placeholder="Descripción de la NC..." value={ncForm.descripcion}
+                                  onChange={e => setNcForm(f => ({ ...f, descripcion: e.target.value }))}
+                                  className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none"
+                                  style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }} />
+                        <input type="date" value={ncForm.fecha_limite}
+                               onChange={e => setNcForm(f => ({ ...f, fecha_limite: e.target.value }))}
+                               className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+                               style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }} />
+                        <div className="flex gap-2">
+                          <button onClick={() => { setNcTarget(null); setNcForm({ descripcion: '', fecha_limite: '' }) }}
+                                  className="flex-1 py-1.5 rounded-lg text-xs" style={{ color: sub }}>
+                            Cancelar
+                          </button>
+                          <button onClick={guardarNC} disabled={loading}
+                                  className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
+                                  style={{ backgroundColor: '#6366F1' }}>
+                            {loading ? 'Guardando...' : 'Guardar NC'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setNcTarget(h.id); setEditingNcId(null) }}
+                              className="text-xs font-semibold hover:underline"
+                              style={{ color: '#6366F1' }}>
+                        + Crear No Conformidad
+                      </button>
+                    )
                   )}
                 </div>
               ))}
-
-              {/* Form NC */}
-              {ncTarget && (
-                <div className="rounded-xl p-4 space-y-3 border-2" style={{ borderColor: '#6366F1', backgroundColor: input }}>
-                  <p className="text-sm font-semibold" style={{ color: text }}>Nueva No Conformidad</p>
-                  <textarea rows={2} placeholder="Descripción de la NC..." value={ncForm.descripcion}
-                            onChange={e => setNcForm(f => ({ ...f, descripcion: e.target.value }))}
-                            className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none"
-                            style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
-                  <input type="date" value={ncForm.fecha_limite}
-                         onChange={e => setNcForm(f => ({ ...f, fecha_limite: e.target.value }))}
-                         className="w-full rounded-lg px-3 py-2 text-sm outline-none"
-                         style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
-                  <div className="flex gap-2">
-                    <button onClick={() => { setNcTarget(null); setNcForm({ descripcion: '', fecha_limite: '' }) }}
-                            className="flex-1 py-2 rounded-lg text-sm" style={{ color: sub }}>
-                      Cancelar
-                    </button>
-                    <button onClick={guardarNC} disabled={loading}
-                            className="flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
-                            style={{ backgroundColor: '#6366F1' }}>
-                      {loading ? 'Guardando...' : 'Guardar NC'}
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Nuevo hallazgo */}
               <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: input, border: `1px solid ${border}` }}>
@@ -432,7 +555,7 @@ export default function Auditorias() {
                  style={{ backgroundColor: card, border: `1px solid ${border}` }}>
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-sm" style={{ color: text }}>
-                  {new Date(a.fecha_programada).toLocaleDateString('es-CO')}
+                  {fmtFecha(a.fecha_programada)}
                 </p>
                 <Badge text={ESTADO_LABEL[a.estado] || a.estado}
                        colorClass={ESTADO_COLOR[a.estado] || 'bg-gray-500/20 text-gray-300'} />

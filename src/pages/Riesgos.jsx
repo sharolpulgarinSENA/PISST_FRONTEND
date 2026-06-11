@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Plus, X, ShieldAlert, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, X, ShieldAlert, ChevronDown, ChevronUp, BarChart2, Shield, Users } from 'lucide-react'
 import { riesgosAPI } from '../services/api'
 
 const TIPOS_PELIGRO = [
@@ -122,7 +122,7 @@ function ModalNuevoPeligro({ darkMode, onClose, onCreado }) {
 /* ══════════════════════════════════════════
    MODAL: DETALLE PELIGRO
 ══════════════════════════════════════════ */
-function ModalDetalle({ darkMode, peligro, onClose }) {
+function ModalDetalle({ darkMode, peligro, onClose, onRefresh }) {
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
@@ -135,6 +135,8 @@ function ModalDetalle({ darkMode, peligro, onClose }) {
   const [evalForm, setEvalForm] = useState({ probabilidad: 1, severidad: 1, es_residual: false })
   const [controlForm, setControlForm] = useState({ descripcion: '', tipo: '', fecha_limite: '' })
   const [loading, setLoading] = useState(false)
+  const [editingControlId, setEditingControlId] = useState(null)
+  const [editControlForm, setEditControlForm] = useState({ descripcion: '', estado: '', evidencia: '' })
 
   useEffect(() => {
     riesgosAPI.getPeligro(peligro.id)
@@ -156,8 +158,32 @@ function ModalDetalle({ darkMode, peligro, onClose }) {
       const r = await riesgosAPI.getPeligro(peligro.id)
       setDetalle(r.data)
       setBanner('')
+      onRefresh()
     } catch (err) {
       setBanner(err.response?.data?.detail || 'Error al guardar evaluación.')
+    } finally { setLoading(false) }
+  }
+
+  const iniciarEdicionControl = (m) => {
+    setEditingControlId(m.id)
+    setEditControlForm({ descripcion: m.descripcion, estado: m.estado || '', evidencia: m.evidencia || '' })
+    setBanner('')
+  }
+
+  const guardarEdicionControl = async () => {
+    setLoading(true)
+    try {
+      await riesgosAPI.actualizarControl(editingControlId, {
+        descripcion: editControlForm.descripcion || undefined,
+        estado:      editControlForm.estado      || undefined,
+        evidencia:   editControlForm.evidencia   || undefined,
+      })
+      const r = await riesgosAPI.getPeligro(peligro.id)
+      setDetalle(r.data)
+      setEditingControlId(null)
+      setBanner('')
+    } catch (err) {
+      setBanner(err.response?.data?.detail || 'Error al actualizar el control.')
     } finally { setLoading(false) }
   }
 
@@ -183,8 +209,8 @@ function ModalDetalle({ darkMode, peligro, onClose }) {
   }
 
   const tabs = [
-    { id: 'evaluacion', label: '📊 Evaluación' },
-    { id: 'controles',  label: '🛡️ Controles' },
+    { id: 'evaluacion', label: 'Evaluación', Icon: BarChart2 },
+    { id: 'controles',  label: 'Controles',  Icon: Shield    },
   ]
 
   return (
@@ -205,9 +231,9 @@ function ModalDetalle({ darkMode, peligro, onClose }) {
         <div className="flex border-b px-6" style={{ borderColor: border }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => { setTab(t.id); setBanner('') }}
-                    className="px-4 py-3 text-sm font-medium border-b-2 transition"
+                    className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition"
                     style={{ borderColor: tab === t.id ? '#6366F1' : 'transparent', color: tab === t.id ? '#6366F1' : sub }}>
-              {t.label}
+              <t.Icon className="w-4 h-4 shrink-0" />{t.label}
             </button>
           ))}
         </div>
@@ -295,10 +321,61 @@ function ModalDetalle({ darkMode, peligro, onClose }) {
               )}
               {detalle?.medidas_control?.map(m => (
                 <div key={m.id} className="rounded-lg p-3" style={{ backgroundColor: input }}>
-                  <p className="text-sm font-medium" style={{ color: text }}>{m.descripcion}</p>
-                  <p className="text-xs mt-1 capitalize" style={{ color: sub }}>
-                    Tipo: {m.tipo} · Estado: {m.estado}
-                  </p>
+                  {editingControlId === m.id ? (
+                    <div className="space-y-2">
+                      <textarea rows={2} value={editControlForm.descripcion}
+                                onChange={e => setEditControlForm(f => ({ ...f, descripcion: e.target.value }))}
+                                className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none"
+                                style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
+                      <div className="grid grid-cols-2 gap-2">
+                        <select value={editControlForm.estado}
+                                onChange={e => setEditControlForm(f => ({ ...f, estado: e.target.value }))}
+                                className="rounded-lg px-3 py-2 text-sm outline-none"
+                                style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }}>
+                          <option value="">Estado...</option>
+                          <option value="pendiente">Pendiente</option>
+                          <option value="en_proceso">En proceso</option>
+                          <option value="implementado">Implementado</option>
+                        </select>
+                        <input type="text" placeholder="Evidencia (URL o descripción)"
+                               value={editControlForm.evidencia}
+                               onChange={e => setEditControlForm(f => ({ ...f, evidencia: e.target.value }))}
+                               className="rounded-lg px-3 py-2 text-sm outline-none"
+                               style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={guardarEdicionControl} disabled={loading}
+                                className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
+                                style={{ backgroundColor: '#6366F1' }}>
+                          {loading ? 'Guardando...' : 'Guardar'}
+                        </button>
+                        <button onClick={() => setEditingControlId(null)}
+                                className="px-3 py-1.5 rounded-lg text-xs"
+                                style={{ color: sub }}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium" style={{ color: text }}>{m.descripcion}</p>
+                        <p className="text-xs mt-1 capitalize" style={{ color: sub }}>
+                          Tipo: {m.tipo} · Estado: {m.estado || 'pendiente'}
+                        </p>
+                        {m.evidencia && (
+                          <p className="text-xs mt-0.5 truncate" style={{ color: sub }}>
+                            Evidencia: {m.evidencia}
+                          </p>
+                        )}
+                      </div>
+                      <button onClick={() => iniciarEdicionControl(m)}
+                              className="text-xs font-semibold shrink-0"
+                              style={{ color: '#6366F1' }}>
+                        Editar
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -362,10 +439,10 @@ export default function Riesgos() {
   useEffect(() => { cargar() }, [])
 
   const matrizItems = [
-    { label: 'Crítico',  key: 'critico',  color: 'text-red-400',    bg: 'bg-red-500/10' },
-    { label: 'Alto',     key: 'alto',     color: 'text-orange-400', bg: 'bg-orange-500/10' },
-    { label: 'Medio',    key: 'medio',    color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
-    { label: 'Bajo',     key: 'bajo',     color: 'text-green-400',  bg: 'bg-green-500/10' },
+    { label: 'Crítico',  key: 'criticos',  color: 'text-red-400',    bg: 'bg-red-500/10' },
+    { label: 'Alto',     key: 'altos',     color: 'text-orange-400', bg: 'bg-orange-500/10' },
+    { label: 'Medio',    key: 'medios',    color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+    { label: 'Bajo',     key: 'bajos',     color: 'text-green-400',  bg: 'bg-green-500/10' },
   ]
 
   return (
@@ -417,8 +494,9 @@ export default function Riesgos() {
                        colorClass={p.activo ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300'} />
               </div>
               <p className="text-xs leading-relaxed line-clamp-2" style={{ color: sub }}>{p.descripcion}</p>
-              <div className="text-xs" style={{ color: sub }}>
-                👥 {p.trabajadores_expuestos} trabajadores expuestos
+              <div className="flex items-center gap-1 text-xs" style={{ color: sub }}>
+                <Users className="w-3.5 h-3.5 shrink-0" />
+                {p.trabajadores_expuestos} trabajadores expuestos
               </div>
               <button onClick={() => setModalDetalle(p)}
                       className="text-xs font-semibold hover:underline text-left mt-auto"
@@ -434,7 +512,7 @@ export default function Riesgos() {
         <ModalNuevoPeligro darkMode={darkMode} onClose={() => setModalNuevo(false)} onCreado={cargar} />
       )}
       {modalDetalle && (
-        <ModalDetalle darkMode={darkMode} peligro={modalDetalle} onClose={() => setModalDetalle(null)} />
+        <ModalDetalle darkMode={darkMode} peligro={modalDetalle} onClose={() => setModalDetalle(null)} onRefresh={cargar} />
       )}
     </div>
   )

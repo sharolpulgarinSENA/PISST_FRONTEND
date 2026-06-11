@@ -1,4 +1,4 @@
-import { Home, FileText, ShieldCheck, GraduationCap, ClipboardList, MoreHorizontal } from 'lucide-react'
+import { Home, FileText, ShieldCheck, GraduationCap, ClipboardList, Users } from 'lucide-react'
 
 const items = [
   { id: 'dashboard', label: 'Dashboard', Icon: Home },
@@ -6,7 +6,7 @@ const items = [
   { id: 'evaluacion', label: 'Evaluación', Icon: ShieldCheck },
   { id: 'capacitaciones', label: 'Capacitaciones', Icon: GraduationCap },
   { id: 'auditorias', label: 'Auditorías', Icon: ClipboardList },
-  { id: 'mas', label: 'Más', Icon: MoreHorizontal },
+  { id: 'mas', label: 'Usuarios', Icon: Users },
 ]
 
 export default function MobileBottomNav({ darkMode, active = 'dashboard', onChange }) {

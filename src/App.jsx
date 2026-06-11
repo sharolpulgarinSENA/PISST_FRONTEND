@@ -1,17 +1,20 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Chat from './pages/Chat'
-import Incidentes from './pages/Incidentes'
-import Capacitaciones from './pages/Capacitaciones'
-import Riesgos from './pages/Riesgos'
-import Auditorias from './pages/Auditorias'
-import Usuarios from './pages/Usuarios'
-import ResetPassword from './pages/ResetPassword'
-import CambiarPassword from './pages/CambiarPassword'
-import Mantenimiento from './pages/Mantenimiento'
+
+const Login          = lazy(() => import('./pages/Login'))
+const Dashboard      = lazy(() => import('./pages/Dashboard'))
+const Chat           = lazy(() => import('./pages/Chat'))
+const Incidentes     = lazy(() => import('./pages/Incidentes'))
+const Capacitaciones = lazy(() => import('./pages/Capacitaciones'))
+const Riesgos        = lazy(() => import('./pages/Riesgos'))
+const Auditorias     = lazy(() => import('./pages/Auditorias'))
+const Usuarios       = lazy(() => import('./pages/Usuarios'))
+const PerfilSST      = lazy(() => import('./pages/PerfilSST'))
+const ResetPassword  = lazy(() => import('./pages/ResetPassword'))
+const CambiarPassword = lazy(() => import('./pages/CambiarPassword'))
+const Mantenimiento  = lazy(() => import('./pages/Mantenimiento'))
 
 function PrivateRoute({ children, roles }) {
   const { token, user } = useAuth()
@@ -28,6 +31,11 @@ export default function App() {
   const userRole = user?.role?.toString?.().toLowerCase?.()
 
   return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen" style={{ backgroundColor: '#0B0F19' }}>
+        <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+      </div>
+    }>
     <Routes>
       {/* ── Rutas públicas (sin Layout, accesibles sin sesión) ── */}
       <Route path="/login"           element={<Login />} />
@@ -54,10 +62,12 @@ export default function App() {
         <Route path="/riesgos"        element={<PrivateRoute roles={['sst']}><Riesgos /></PrivateRoute>} />
         <Route path="/auditorias"     element={<PrivateRoute roles={['sst']}><Auditorias /></PrivateRoute>} />
         <Route path="/usuarios"       element={<PrivateRoute roles={['sst']}><Usuarios /></PrivateRoute>} />
+        <Route path="/perfil"         element={<PrivateRoute><PerfilSST /></PrivateRoute>} />
       </Route>
 
       {/* ── Catch-all ── */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
+    </Suspense>
   )
 }

@@ -229,6 +229,7 @@
 
 import { Mail, Lock, Eye, EyeOff, Shield, BarChart2, Users, Globe, Sun, Moon, ChevronDown, Check } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
+import ReCAPTCHA from 'react-google-recaptcha'
 import logoClaro from '../assets/imagenes/pisst_logo.png'                       // logo claro → fondo oscuro
 import logoOscuro from '../assets/imagenes/logopisstCLaro-removebg-preview.png' // logo oscuro → fondo claro
 import { useNavigate } from 'react-router-dom'
@@ -250,7 +251,7 @@ const T = {
       { titulo: 'Gestión inteligente',      desc: 'Automatiza procesos y optimiza recursos con análisis predictivo en tiempo real.' },
       { titulo: 'Colaboración sin límites', desc: 'Coordina equipos multidisciplinarios con comunicación fluida y acceso compartido.' },
     ],
-    quote: '❝ Tecnología que cuida, gestión que transforma.',
+    quote: '"Tecnología que cuida, gestión que transforma."',
     welcome: 'Bienvenido de nuevo',
     welcomeSub: 'Inicia sesión para continuar en tu cuenta',
     email: 'Correo electrónico',
@@ -264,6 +265,7 @@ const T = {
     noAccount: '¿No tienes una cuenta?',
     requestAccess: 'Solicita acceso',
     fillFields: 'Por favor completa todos los campos',
+    captchaRequired: 'Por favor completa el reCAPTCHA.',
     tooMany: 'Demasiados intentos. Intenta más tarde.',
     loginError: 'Correo o contraseña incorrectos',
     rights: '© 2026 PISST. Todos los derechos reservados.',
@@ -280,7 +282,7 @@ const T = {
       { titulo: 'Smart management',         desc: 'Automate processes and optimize resources with real-time predictive analytics.' },
       { titulo: 'Limitless collaboration',  desc: 'Coordinate multidisciplinary teams with smooth communication and shared access.' },
     ],
-    quote: '❝ Technology that cares, management that transforms.',
+    quote: '"Technology that cares, management that transforms."',
     welcome: 'Welcome back',
     welcomeSub: 'Sign in to continue to your account',
     email: 'Email address',
@@ -294,6 +296,7 @@ const T = {
     noAccount: "Don't have an account?",
     requestAccess: 'Request access',
     fillFields: 'Please fill in all fields',
+    captchaRequired: 'Please complete the reCAPTCHA.',
     tooMany: 'Too many attempts. Try again later.',
     loginError: 'Incorrect email or password',
     rights: '© 2026 PISST. All rights reserved.',
@@ -312,6 +315,8 @@ export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState(null)
+  const captchaRef = useRef(null)
   const navigate = useNavigate()
   const { login } = useAuth()
 
@@ -363,13 +368,14 @@ export default function Login() {
 
  async function handleLogin() {
   if (!form.email || !form.password) { setError(t.fillFields); return }
+  if (!captchaToken) { setError(t.captchaRequired); return }
   setError('')
   setLoading(true)
   try {
     const response = await api.post('/auth/login', {
       email: form.email,
       password: form.password,
-      recaptcha_token: 'test',
+      recaptcha_token: captchaToken,
     })
     const { access_token, refresh_token, role, nombre, debe_cambiar_password } = response.data
     const normalizedRole = role?.toString?.().toLowerCase?.()
@@ -394,6 +400,8 @@ export default function Login() {
     const detalle = err.response?.data?.detail
     if (status === 429) setError(t.tooMany)
     else setError(typeof detalle === 'string' ? detalle : t.loginError)
+    captchaRef.current?.reset()
+    setCaptchaToken(null)
   } finally {
     setLoading(false)
   }
@@ -556,10 +564,21 @@ export default function Login() {
               </button>
             </div>
 
+            <div className="flex justify-center">
+              <ReCAPTCHA
+                ref={captchaRef}
+                sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                hl={lang}
+                theme={dark ? 'dark' : 'light'}
+                onChange={(token) => { setCaptchaToken(token); setError('') }}
+                onExpired={() => setCaptchaToken(null)}
+              />
+            </div>
+
             <button
               onClick={handleLogin}
-              disabled={loading}
-              className="w-full text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-60"
+              disabled={loading || !captchaToken}
+              className="w-full text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: btnGrad }}
             >
               {loading ? '...' : `${t.signin} →`}

@@ -14,6 +14,7 @@ export default function KPICard({
 }) {
   // Convertimos el array de números en formato que entiende recharts
   const data = trend.map((v, i) => ({ x: i, y: v }))
+  const muted = darkMode ? '#9CA3AF' : '#6B7280'
 
   return (
     <article
@@ -30,7 +31,7 @@ export default function KPICard({
         </div>
         <span
           className="text-xs text-right leading-tight max-w-[60%]"
-          style={{ color: '#9CA3AF' }}
+          style={{ color: muted }}
         >
           {label}
         </span>
@@ -48,7 +49,7 @@ export default function KPICard({
       <div className="flex items-end justify-between gap-2">
         <span
           className="text-xs font-medium"
-          style={{ color: deltaPositive ? '#10B981' : '#EF4444' }}
+          style={{ color: deltaPositive ? (darkMode ? '#34D399' : '#059669') : (darkMode ? '#F87171' : '#DC2626') }}
         >
           {delta}
         </span>
