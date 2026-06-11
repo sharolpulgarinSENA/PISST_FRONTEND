@@ -6,86 +6,111 @@ import { useAuth } from '../context/AuthContext'
 import api from '../services/api'
 
 export default function Login() {
-    const [showPass, setShowPass] = useState(false)
-    const [form, setForm] = useState({ email: '', password: '' })
-    const [error, setError] = useState('')
-    const navigate = useNavigate()
-    const { login } = useAuth()
+  const [showPass, setShowPass] = useState(false)
+  const [form,     setForm]     = useState({ email: '', password: '' })
+  const [error,    setError]    = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const navigate = useNavigate()
+  const { login } = useAuth()
+
+  const handleLogin = async () => {
+    if (!form.email || !form.password) {
+      setError('Por favor completa todos los campos')
+      return
+    }
+    setError('')
+    setLoading(true)
+    try {
+      const response = await api.post('/auth/login', {
+        email:           form.email,
+        password:        form.password,
+        recaptcha_token: 'test',
+      })
+      const { access_token, role, nombre, id } = response.data
+      const normalizedRole = role?.toString?.().toLowerCase?.()
+      login(access_token, { role: normalizedRole, nombre, email: form.email, id })
+
+      if      (normalizedRole === 'sst')      navigate('/dashboard')
+      else if (normalizedRole === 'gerencia') navigate('/dashboard')
+      else if (normalizedRole === 'empleado') navigate('/empleado/chat')
+      else                                    navigate('/chat')
+
+    } catch (err) {
+      const status  = err.response?.status
+      const detalle = err.response?.data?.detail || 'Error al iniciar sesión'
+      if (status === 429) {
+        setError('Demasiados intentos. Intenta más tarde.')
+      } else {
+        setError(typeof detalle === 'string' ? detalle : 'Correo o contraseña incorrectos')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#0B0F19' }}>
-
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Columna izquierda ── */}
+        {/* Columna izquierda */}
         <div className="hidden lg:flex w-[55%] flex-col justify-between p-7 relative overflow-hidden"
-            style={{ backgroundColor: '#0B0F19' }}>
+             style={{ backgroundColor: '#0B0F19' }}>
 
-        {/* Luz de fondo */}
-        <div className="absolute top-1/3 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)' }} />
+          <div className="absolute top-1/3 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full pointer-events-none"
+               style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)' }} />
 
-        {/* Logo */}
-        <img src={logo} alt="PISST Logo"
-            style={{ height: '140px' }} // Reducido un toque para dar más aire limpio
-            className="object-contain object-left mt-2 z-10" />
+          <img src={logo} alt="PISST Logo"
+               style={{ height: '140px' }}
+               className="object-contain object-left mt-2 z-10" />
 
-        {/* Contenedor Agrupado que sube el contenido (Ajustado con -mt-16 para alineación perfecta con el Login) */}
-        <div className="space-y-6 z-10 -mt-16 flex-1 flex flex-col justify-center">
-            
-            {/* Texto principal */}
+          <div className="space-y-6 z-10 -mt-16 flex-1 flex flex-col justify-center">
             <div className="space-y-4">
-            <h1 className="text-white font-bold leading-tight" style={{ fontSize: '40px' }}>
+              <h1 className="text-white font-bold leading-tight" style={{ fontSize: '40px' }}>
                 Plataforma integral SST{' '}
                 <span style={{ color: '#6366F1' }}>Potenciadora de procesos</span>
-            </h1>
-            {/* Se aumentó el interlineado a leading-loose y el texto a text-sm/tracking-wide */}
-            <p className="text-sm leading-loose tracking-wide max-w-md" style={{ color: '#9CA3AF' }}>
+              </h1>
+              <p className="text-sm leading-loose tracking-wide max-w-md" style={{ color: '#9CA3AF' }}>
                 PISST centraliza la gestión de procesos SG-SST en un solo lugar,
                 con herramientas seguras, intuitivas y diseñadas para equipos de
                 alto rendimiento.
-            </p>
+              </p>
             </div>
 
-            {/* Features */}
             <div className="space-y-4 pt-2">
-            {[
-                { icon: Shield,   titulo: 'Seguridad y privacidad',   desc: 'Protección de datos médicos con cifrado de extremo a extremo y cumplimiento normativo.' },
+              {[
+                { icon: Shield,    titulo: 'Seguridad y privacidad',   desc: 'Protección de datos médicos con cifrado de extremo a extremo y cumplimiento normativo.' },
                 { icon: BarChart2, titulo: 'Gestión inteligente',      desc: 'Automatiza procesos y optimiza recursos con análisis predictivo en tiempo real.' },
                 { icon: Users,     titulo: 'Colaboración sin límites', desc: 'Coordina equipos multidisciplinarios con comunicación fluida y acceso compartido.' },
-            ].map(({ icon: Icon, titulo, desc }) => (
+              ].map(({ icon: Icon, titulo, desc }) => (
                 <div key={titulo} className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
-                    style={{ backgroundColor: '#1A1F33' }}>
+                  <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
+                       style={{ backgroundColor: '#1A1F33' }}>
                     <Icon size={17} style={{ color: '#6366F1' }} />
-                </div>
-                <div>
+                  </div>
+                  <div>
                     <p className="text-white font-semibold text-sm">{titulo}</p>
-                    {/* Se mejoró el interlineado de las descripciones cortas */}
                     <p className="text-xs mt-1 leading-relaxed tracking-wide" style={{ color: '#9CA3AF' }}>{desc}</p>
+                  </div>
                 </div>
-                </div>
-            ))}
+              ))}
             </div>
+          </div>
+
+          <p className="text-sm z-10 pt-4" style={{ color: '#6366F1' }}>
+            ❝ Tecnología que cuida, gestión que transforma.
+          </p>
         </div>
 
-        {/* Frase Fija Abajo */}
-        <p className="text-sm z-10 pt-4" style={{ color: '#6366F1' }}>
-            ❝ Tecnología que cuida, gestión que transforma.
-        </p>
-        </div>
-        {/* ── Columna derecha ── */}
+        {/* Columna derecha */}
         <div className="w-full lg:w-[45%] flex flex-col justify-between p-6 lg:p-8"
              style={{ backgroundColor: '#0B0F19' }}>
 
-          {/* Idioma */}
           <div className="flex justify-end pt-4 pb-2">
             <span className="text-sm flex items-center gap-1.5 cursor-pointer" style={{ color: '#9CA3AF' }}>
               <Globe size={14} /> Español ▾
             </span>
           </div>
 
-          {/* Card flotante */}
           <div className="max-w-sm w-full mx-auto rounded-2xl p-8 space-y-4"
                style={{
                  backgroundColor: '#111827',
@@ -105,11 +130,12 @@ export default function Login() {
                    style={{ backgroundColor: '#1A1F33', borderColor: '#374151' }}>
                 <Mail size={15} style={{ color: '#9CA3AF' }} />
                 <input
-                type="email"
-                placeholder="tu@pisst.com"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="bg-transparent text-white text-sm outline-none w-full placeholder:text-[#9CA3AF]"
+                  type="email"
+                  placeholder="tu@pisst.com"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                  className="bg-transparent text-white text-sm outline-none w-full placeholder:text-[#9CA3AF]"
                 />
               </div>
             </div>
@@ -121,13 +147,18 @@ export default function Login() {
                    style={{ backgroundColor: '#1A1F33', borderColor: '#374151' }}>
                 <Lock size={15} style={{ color: '#9CA3AF' }} />
                 <input
-                type={showPass ? 'text' : 'password'}
-                placeholder="Tu contraseña"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="bg-transparent text-white text-sm outline-none w-full placeholder:text-[#9CA3AF]"
+                  type={showPass ? 'text' : 'password'}
+                  placeholder="Tu contraseña"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                  className="bg-transparent text-white text-sm outline-none w-full placeholder:text-[#9CA3AF]"
                 />
-
+                <button type="button" onClick={() => setShowPass(!showPass)} className="focus:outline-none">
+                  {showPass
+                    ? <EyeOff size={15} style={{ color: '#9CA3AF' }} />
+                    : <Eye    size={15} style={{ color: '#9CA3AF' }} />}
+                </button>
               </div>
             </div>
 
@@ -144,54 +175,28 @@ export default function Login() {
 
             {/* Botón */}
             <button
-               onClick={async () => {
-                if (!form.email || !form.password) {
-                  setError('Por favor completa todos los campos')
-                  return
-                }
-                setError('')
-               try {
-                  const response = await api.post('/auth/login', {
-                    email: form.email,
-                    password: form.password,
-                    recaptcha_token: 'test',
-                  })
-                  const { access_token, role, nombre } = response.data
-                  const normalizedRole = role?.toString?.().toLowerCase?.()
-                  login(access_token, { role: normalizedRole, nombre, email: form.email })
-                  if (normalizedRole === 'sst') navigate('/dashboard')
-                  else if (normalizedRole === 'gerencia') navigate('/dashboard')
-                  else navigate('/chat')
-                } catch (err) {
-                  const status  = err.response?.status
-                  const detalle = err.response?.data?.detail || 'Error al iniciar sesión'
-                  if (status === 429) {
-                    setError('Demasiados intentos. Intenta más tarde.')
-                  } else {
-                    setError(typeof detalle === 'string' ? detalle : 'Correo o contraseña incorrectos')
-                  }
-                }
+              disabled={loading}
+              onClick={handleLogin}
+              className="w-full text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition"
+              style={{
+                background: loading ? '#374151' : 'linear-gradient(to right, #A5B4FC, #8B94FF)',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
               }}
-                className="w-full text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition"
-                style={{ background: 'linear-gradient(to right, #A5B4FC, #8B94FF)' }}
-                >
-                Iniciar sesión →
-                </button>
-                {/* en caso de error */}
-                {error && (
-                <p className="text-xs text-center" style={{ color: '#EF4444' }}>
-                    {error}
-                </p>
-                )}
+            >
+              {loading ? 'Iniciando sesión...' : 'Iniciar sesión →'}
+            </button>
 
-            {/* Divider */}
+            {error && (
+              <p className="text-xs text-center" style={{ color: '#EF4444' }}>{error}</p>
+            )}
+
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px" style={{ backgroundColor: '#374151' }} />
               <span className="text-xs" style={{ color: '#9CA3AF' }}>o continúa con</span>
               <div className="flex-1 h-px" style={{ backgroundColor: '#374151' }} />
             </div>
 
-            {/* Google y Microsoft */}
             <div className="grid grid-cols-2 gap-3">
               <button className="border rounded-lg py-2 text-white text-sm font-medium flex items-center justify-center gap-2 hover:opacity-80 transition"
                       style={{ backgroundColor: '#1A1F33', borderColor: '#374151' }}>
@@ -209,13 +214,11 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Footer */}
           <div className="flex items-center justify-center gap-6 pt-4 pb-2">
             <span className="text-xs" style={{ color: '#6B7280' }}>© 2026 PISST. Todos los derechos reservados.</span>
             <a href="#" className="text-xs hover:text-white" style={{ color: '#6B7280' }}>Privacidad</a>
             <a href="#" className="text-xs hover:text-white" style={{ color: '#6B7280' }}>Términos</a>
           </div>
-
         </div>
       </div>
     </div>
