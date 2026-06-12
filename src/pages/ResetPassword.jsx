@@ -206,7 +206,7 @@ function ModoRestablecer({ navigate, token, theme }) {
     }
     setLoading(true);
     try {
-      await authAPI.resetPassword({ token, new_password: form.nueva });
+      await authAPI.resetPassword({ token, nueva_password: form.nueva });
       setOk(true);
       setTimeout(() => navigate("/login?reset=ok"), 1400);
     } catch (err) {

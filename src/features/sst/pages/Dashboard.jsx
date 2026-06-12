@@ -5,12 +5,12 @@ import {
   TrendingUp, AlertCircle, CheckCircle2, FileSearch,
 } from 'lucide-react'
 
-import KPICard from '../components/dashboard/KPICard'
-import MetricsAccordion from '../components/dashboard/MetricsAccordion'
-import OverviewChart from '../components/dashboard/OverviewChart'
-import AnalyticsSummary from '../components/dashboard/AnalyticsSummary'
-import ReportDocumentation from '../components/dashboard/ReportDocumentation'
-import { metricasAPI, analyticsAPI } from '../services/api'
+import KPICard from '../../../components/dashboard/KPICard'
+import MetricsAccordion from '../../../components/dashboard/MetricsAccordion'
+import OverviewChart from '../../../components/dashboard/OverviewChart'
+import AnalyticsSummary from '../../../components/dashboard/AnalyticsSummary'
+import ReportDocumentation from '../../../components/dashboard/ReportDocumentation'
+import { metricasAPI, analyticsAPI } from '../../../services/api'
 import { useOutletContext } from 'react-router-dom'
 
 export default function Dashboard() {

@@ -3,9 +3,11 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import Sidebar from './layout/Sidebar'
 import Navbar from './layout/Navbar'
 import MobileBottomNav from './layout/MobileBottomNav'
+import SasbotWidget from './chat/SasbotWidget'
 import { useTheme } from '../context/ThemeContext'
+import { useAuth } from '../context/AuthContext'
 
-const routeToNav = {
+const routeToNavSST = {
   '/dashboard':      'dashboard',
   '/incidentes':     'reportes',
   '/riesgos':        'evaluacion',
@@ -13,7 +15,7 @@ const routeToNav = {
   '/auditorias':     'auditorias',
 }
 
-const navToRoute = {
+const navToRouteSST = {
   dashboard:      '/dashboard',
   reportes:       '/incidentes',
   evaluacion:     '/riesgos',
@@ -22,12 +24,29 @@ const navToRoute = {
   mas:            '/usuarios',
 }
 
+const routeToNavGerencia = {
+  '/dashboard':  'dashboard',
+  '/incidentes': 'reportes',
+  '/perfil':     'perfil',
+}
+
+const navToRouteGerencia = {
+  dashboard: '/dashboard',
+  reportes:  '/incidentes',
+  perfil:    '/perfil',
+}
+
 export default function Layout() {
   // El tema ahora viene del contexto global (persistido y sincronizado con el Login)
   const { darkMode, setDarkMode } = useTheme()
+  const { user } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const navigate  = useNavigate()
   const location  = useLocation()
+
+  const esGerencia = user?.role?.toString?.().toLowerCase?.() === 'gerencia'
+  const routeToNav = esGerencia ? routeToNavGerencia : routeToNavSST
+  const navToRoute = esGerencia ? navToRouteGerencia : navToRouteSST
 
   const activeNav = routeToNav[location.pathname] || 'dashboard'
 
@@ -59,7 +78,10 @@ export default function Layout() {
         darkMode={darkMode}
         active={activeNav}
         onChange={handleNavChange}
+        role={user?.role}
       />
+
+      <SasbotWidget darkMode={darkMode} />
     </div>
   )
 }

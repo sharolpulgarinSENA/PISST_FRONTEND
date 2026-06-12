@@ -21,10 +21,19 @@ const ICONOS_EVENTO = {
   riesgo_nuevo:                     ShieldAlert,
   accion_correctiva_nueva:          ClipboardList,
   accion_correctiva_completada:     CheckSquare,
+  accion_correctiva_vencida:        AlertOctagon,
+  accion_correctiva_proxima_vencer: Clock,
   auditoria_nueva:                  FileSearch,
   auditoria_vencida:                AlertOctagon,
+  auditoria_proxima_vencer:         Clock,
   hallazgo_nuevo:                   Search,
+  hallazgo_vencido:                 AlertOctagon,
+  hallazgo_proximo_vencer:          Clock,
   investigacion_completada:         FileCheck,
+  capacitacion_sesion_vencida:      AlertOctagon,
+  capacitacion_sesion_proxima_vencer: Clock,
+  riesgo_control_vencido:           AlertOctagon,
+  riesgo_control_proximo_vencer:    Clock,
 }
 
 function normFecha(f) {
@@ -57,6 +66,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const esGerencia = user?.role?.toString?.().toLowerCase?.() === 'gerencia'
 
   /* ── Usuario ── */
   const userRef = useRef(null)
@@ -75,6 +85,8 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
 
   useEffect(() => {
     cargarNotificaciones()
+    const intervalo = setInterval(cargarNotificaciones, 60000)
+    return () => clearInterval(intervalo)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -138,7 +150,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
 
   function manejarClickAlerta(alerta) {
     setPanelOpen(false)
-    navigate(alerta.url_destino)
+    if (alerta.url_destino) navigate(alerta.url_destino)
   }
 
   async function manejarClickEvento(evento) {
@@ -151,7 +163,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
       setEventos((prev) => prev.map((e) => (e.id === evento.id ? { ...e, leido: true } : e)))
     }
     setPanelOpen(false)
-    navigate(evento.url_destino)
+    if (evento.url_destino) navigate(evento.url_destino)
   }
 
   const noLeidos   = eventos.filter((e) => !e.leido).length
@@ -246,12 +258,16 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
 
       {/* ============ CENTRO: Acciones rápidas (solo desktop) ============ */}
       <div className="hidden md:flex items-center gap-2">
-        {[
+        {(esGerencia ? [
+          { label: 'Dashboard',     path: '/dashboard' },
+          { label: 'Nuevo reporte', path: '/incidentes?nuevo=true' },
+          { label: 'Mis reportes',  path: '/incidentes' },
+        ] : [
           { label: 'Nuevo reporte',        path: '/incidentes?nuevo=true' },
           { label: 'Capacitaciones',       path: '/capacitaciones' },
           { label: 'Evaluación de Riesgos',path: '/riesgos' },
           { label: 'Auditorías',           path: '/auditorias' },
-        ].map(({ label, path }) => (
+        ]).map(({ label, path }) => (
           <button
             key={label}
             onClick={() => navigate(path)}
@@ -313,7 +329,10 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
         {/* Notificaciones */}
         <div className="relative" ref={notifRef}>
           <button
-            onClick={() => setPanelOpen((v) => !v)}
+            onClick={() => setPanelOpen((v) => {
+              if (!v) cargarNotificaciones()
+              return !v
+            })}
             className="relative p-1"
             style={{ color: '#9CA3AF' }}
             aria-label="Notificaciones"

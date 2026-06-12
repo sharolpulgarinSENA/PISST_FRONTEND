@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import {
   Plus, X, BookOpen, ChevronDown, Check, Power, PowerOff, Calendar, MapPin,
   Users, CheckCircle, XCircle, AlertCircle, RotateCcw, Ban,
   ClipboardList, Trash2, GraduationCap, Info, Pencil, Clock
 } from 'lucide-react'
-import { capacitacionesAPI, areasAPI, usuariosAPI } from '../services/api'
+import { capacitacionesAPI, areasAPI, usuariosAPI, getErrorMessage } from '../../../services/api'
 
 /* ══════════════════════════════════════════
    UTILS (sin cambios)
@@ -98,7 +98,7 @@ function SelectorAreas({ areas, selected, onChange, darkMode }) {
         <ChevronDown size={14} style={{ color: sub, flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
       </button>
       {open && (
-        <div className="absolute z-50 w-full mt-1 rounded-xl shadow-xl overflow-hidden" style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+        <div className="absolute z-50 w-full bottom-full mb-1 rounded-xl shadow-xl overflow-hidden" style={{ backgroundColor: card, border: `1px solid ${border}` }}>
           {areas.length === 0
             ? <p className="px-3 py-3 text-xs" style={{ color: sub }}>No hay áreas disponibles.</p>
             : <ul className="max-h-48 overflow-y-auto py-1">
@@ -347,7 +347,7 @@ function PanelEvaluaciones({ sesion, theme }) {
       setModo('ver')
       setBanner({ type: 'ok', msg: 'Evaluación creada correctamente.' })
     } catch (err) {
-      setBanner({ type: 'error', msg: err.response?.data?.detail || 'Error al crear la evaluación.' })
+      setBanner({ type: 'error', msg: getErrorMessage(err, 'Error al crear la evaluación.') })
     } finally { setGuardando(false) }
   }
 
@@ -578,18 +578,18 @@ function ModalNuevaCapacitacion({ darkMode, onClose, onCreada }) {
       })
       onCreada(); onClose()
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al crear la capacitación.')
+      setBanner(getErrorMessage(err, 'Error al crear la capacitación.'))
     } finally { setLoading(false) }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
-      <div className="w-full max-w-md rounded-2xl shadow-2xl" style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl max-h-[90vh] flex flex-col" style={{ backgroundColor: card, border: `1px solid ${border}` }}>
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
           <h2 className="font-bold text-lg" style={{ color: text }}>Nueva Capacitación</h2>
           <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
         </div>
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-4 overflow-y-auto">
           {banner && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{banner}</div>}
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Título *</label>
@@ -656,7 +656,7 @@ function ModalReprogramar({ darkMode, sesion, onClose, onReprogramada }) {
       await capacitacionesAPI.reprogramarSesion(sesion.id, body)
       onReprogramada(); onClose()
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al reprogramar la sesión.')
+      setBanner(getErrorMessage(err, 'Error al reprogramar la sesión.'))
     } finally { setLoading(false) }
   }
 
@@ -818,7 +818,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
         ? await capacitacionesAPI.suspender(capacitacion.id)
         : await capacitacionesAPI.activar(capacitacion.id)
       setCapacitacion(data); onActualizada()
-    } catch (err) { setBanner(err.response?.data?.detail || 'Error al cambiar el estado.')
+    } catch (err) { setBanner(getErrorMessage(err, 'Error al cambiar el estado.'))
     } finally { setLoadingToggle(false) }
   }
 
@@ -830,7 +830,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
         fecha: toColombiaISO(sesionForm.fecha), lugar: sesionForm.lugar || undefined, capacitacion_id: capacitacion.id,
       })
       await cargarSesiones(); setSesionForm({ fecha: '', lugar: '' })
-    } catch (err) { setBanner(err.response?.data?.detail || 'Error al crear la sesión.')
+    } catch (err) { setBanner(getErrorMessage(err, 'Error al crear la sesión.'))
     } finally { setLoading(false) }
   }
 
@@ -839,7 +839,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
     try {
       await capacitacionesAPI.cambiarEstadoSesion(sesion.id, estado)
       await cargarSesiones(); onActualizada(); setSesionCerrar(null)
-    } catch (err) { setBanner(err.response?.data?.detail || 'Error al cambiar el estado de la sesión.')
+    } catch (err) { setBanner(getErrorMessage(err, 'Error al cambiar el estado de la sesión.'))
     } finally { setAccionSesion(false) }
   }
 
@@ -853,7 +853,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
       })
       setCapacitacion(data); onActualizada()
       setBannerEdit({ type: 'ok', msg: 'Cambios guardados correctamente.' })
-    } catch (err) { setBannerEdit({ type: 'error', msg: err.response?.data?.detail || 'Error al guardar.' })
+    } catch (err) { setBannerEdit({ type: 'error', msg: getErrorMessage(err, 'Error al guardar.') })
     } finally { setLoadingEdit(false) }
   }
 
@@ -1102,6 +1102,7 @@ export default function Capacitaciones() {
   const [modalNuevo, setModalNuevo]         = useState(false)
   const [modalDetalle, setModalDetalle]     = useState(null)
   const [filtro, setFiltro]                 = useState('activas')
+  const [searchParams, setSearchParams]     = useSearchParams()
 
   const cargar = async () => {
     setLoading(true)
@@ -1118,6 +1119,15 @@ export default function Capacitaciones() {
   }
 
   useEffect(() => { cargar() }, [])
+
+  // Deep link desde notificaciones: /capacitaciones?capacitacion={id}
+  useEffect(() => {
+    const capId = searchParams.get('capacitacion')
+    if (!capId || capacitaciones.length === 0) return
+    const encontrada = capacitaciones.find(c => String(c.id) === capId)
+    if (encontrada) setModalDetalle(encontrada)
+    setSearchParams({})
+  }, [capacitaciones, searchParams])
 
   const lista = useMemo(() => {
     if (filtro === 'activas')   return capacitaciones.filter(c => c.activo)

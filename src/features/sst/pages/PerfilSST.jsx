@@ -3,8 +3,8 @@ import { useOutletContext } from 'react-router-dom'
 import {
   User, Camera, Mail, Briefcase, Lock, Eye, EyeOff, Check, X, Loader2, History,
 } from 'lucide-react'
-import { usuariosAPI, authAPI } from '../services/api'
-import { useAuth } from '../context/AuthContext'
+import { usuariosAPI, authAPI } from '../../../services/api'
+import { useAuth } from '../../../context/AuthContext'
 
 const REQUISITOS = [
   { id: 'longitud',  label: 'Mínimo 8 caracteres',                            test: (p) => p.length >= 8 },

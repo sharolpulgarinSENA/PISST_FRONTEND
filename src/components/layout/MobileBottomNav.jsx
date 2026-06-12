@@ -1,6 +1,6 @@
-import { Home, FileText, ShieldCheck, GraduationCap, ClipboardList, Users } from 'lucide-react'
+import { Home, FileText, ShieldCheck, GraduationCap, ClipboardList, Users, User } from 'lucide-react'
 
-const items = [
+const itemsSST = [
   { id: 'dashboard', label: 'Dashboard', Icon: Home },
   { id: 'reportes', label: 'Reportes', Icon: FileText },
   { id: 'evaluacion', label: 'Evaluación', Icon: ShieldCheck },
@@ -9,7 +9,14 @@ const items = [
   { id: 'mas', label: 'Usuarios', Icon: Users },
 ]
 
-export default function MobileBottomNav({ darkMode, active = 'dashboard', onChange }) {
+const itemsGerencia = [
+  { id: 'dashboard', label: 'Dashboard', Icon: Home },
+  { id: 'reportes', label: 'Mis reportes', Icon: FileText },
+  { id: 'perfil', label: 'Perfil', Icon: User },
+]
+
+export default function MobileBottomNav({ darkMode, active = 'dashboard', onChange, role }) {
+  const items = role?.toString?.().toLowerCase?.() === 'gerencia' ? itemsGerencia : itemsSST
   return (
     <nav
       className="lg:hidden fixed bottom-0 left-0 right-0 z-40 px-2 py-2 pb-[env(safe-area-inset-bottom)] border-t backdrop-blur"

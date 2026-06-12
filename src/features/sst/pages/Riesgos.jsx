@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { Plus, X, ShieldAlert, ChevronDown, ChevronUp, BarChart2, Shield, Users } from 'lucide-react'
-import { riesgosAPI } from '../services/api'
+import { riesgosAPI, getErrorMessage } from '../../../services/api'
 
 const TIPOS_PELIGRO = [
   'fisico', 'quimico', 'biologico', 'ergonomico',
-  'psicosocial', 'mecanico', 'electrico', 'locativo'
+  'psicosocial', 'mecanico', 'electrico', 'locativo', 'fenomeno_natural'
 ]
 const TIPOS_CONTROL = ['eliminacion', 'sustitucion', 'ingenieria', 'administrativo', 'epp']
+
+const ESTADOS_CONTROL = {
+  planificada:  'Planificada',
+  en_ejecucion: 'En ejecución',
+  completada:   'Completada',
+}
 
 const NIVEL_COLOR = {
   bajo:     'bg-green-500/20 text-green-300',
@@ -59,7 +65,7 @@ function ModalNuevoPeligro({ darkMode, onClose, onCreado }) {
       onCreado()
       onClose()
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al crear el peligro.')
+      setBanner(getErrorMessage(err, 'Error al crear el peligro.'))
     } finally { setLoading(false) }
   }
 
@@ -122,14 +128,14 @@ function ModalNuevoPeligro({ darkMode, onClose, onCreado }) {
 /* ══════════════════════════════════════════
    MODAL: DETALLE PELIGRO
 ══════════════════════════════════════════ */
-function ModalDetalle({ darkMode, peligro, onClose, onRefresh }) {
+function ModalDetalle({ darkMode, peligro, initialTab = 'evaluacion', onClose, onRefresh }) {
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
   const sub    = darkMode ? '#9CA3AF' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
-  const [tab, setTab]       = useState('evaluacion')
+  const [tab, setTab]       = useState(initialTab)
   const [detalle, setDetalle] = useState(null)
   const [banner, setBanner]   = useState('')
   const [evalForm, setEvalForm] = useState({ probabilidad: 1, severidad: 1, es_residual: false })
@@ -160,7 +166,7 @@ function ModalDetalle({ darkMode, peligro, onClose, onRefresh }) {
       setBanner('')
       onRefresh()
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al guardar evaluación.')
+      setBanner(getErrorMessage(err, 'Error al guardar evaluación.'))
     } finally { setLoading(false) }
   }
 
@@ -183,7 +189,7 @@ function ModalDetalle({ darkMode, peligro, onClose, onRefresh }) {
       setEditingControlId(null)
       setBanner('')
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al actualizar el control.')
+      setBanner(getErrorMessage(err, 'Error al actualizar el control.'))
     } finally { setLoading(false) }
   }
 
@@ -204,7 +210,7 @@ function ModalDetalle({ darkMode, peligro, onClose, onRefresh }) {
       setControlForm({ descripcion: '', tipo: '', fecha_limite: '' })
       setBanner('')
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al guardar control.')
+      setBanner(getErrorMessage(err, 'Error al guardar control.'))
     } finally { setLoading(false) }
   }
 
@@ -333,9 +339,9 @@ function ModalDetalle({ darkMode, peligro, onClose, onRefresh }) {
                                 className="rounded-lg px-3 py-2 text-sm outline-none"
                                 style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }}>
                           <option value="">Estado...</option>
-                          <option value="pendiente">Pendiente</option>
-                          <option value="en_proceso">En proceso</option>
-                          <option value="implementado">Implementado</option>
+                          {Object.entries(ESTADOS_CONTROL).map(([v, label]) => (
+                            <option key={v} value={v}>{label}</option>
+                          ))}
                         </select>
                         <input type="text" placeholder="Evidencia (URL o descripción)"
                                value={editControlForm.evidencia}
@@ -360,8 +366,8 @@ function ModalDetalle({ darkMode, peligro, onClose, onRefresh }) {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium" style={{ color: text }}>{m.descripcion}</p>
-                        <p className="text-xs mt-1 capitalize" style={{ color: sub }}>
-                          Tipo: {m.tipo} · Estado: {m.estado || 'pendiente'}
+                        <p className="text-xs mt-1" style={{ color: sub }}>
+                          Tipo: {m.tipo} · Estado: {ESTADOS_CONTROL[m.estado] || m.estado || ESTADOS_CONTROL.planificada}
                         </p>
                         {m.evidencia && (
                           <p className="text-xs mt-0.5 truncate" style={{ color: sub }}>
@@ -427,6 +433,8 @@ export default function Riesgos() {
   const [loading, setLoading]           = useState(true)
   const [modalNuevo, setModalNuevo]     = useState(false)
   const [modalDetalle, setModalDetalle] = useState(null)
+  const [modalTab, setModalTab]         = useState('evaluacion')
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const cargar = () => {
     setLoading(true)
@@ -437,6 +445,18 @@ export default function Riesgos() {
   }
 
   useEffect(() => { cargar() }, [])
+
+  // Deep link desde notificaciones: /riesgos?riesgo={id}&control=1
+  useEffect(() => {
+    const riesgoId = searchParams.get('riesgo')
+    if (!riesgoId || peligros.length === 0) return
+    const encontrado = peligros.find(p => String(p.id) === riesgoId)
+    if (encontrado) {
+      setModalTab(searchParams.get('control') ? 'controles' : 'evaluacion')
+      setModalDetalle(encontrado)
+    }
+    setSearchParams({})
+  }, [peligros, searchParams])
 
   const matrizItems = [
     { label: 'Crítico',  key: 'criticos',  color: 'text-red-400',    bg: 'bg-red-500/10' },
@@ -512,7 +532,7 @@ export default function Riesgos() {
         <ModalNuevoPeligro darkMode={darkMode} onClose={() => setModalNuevo(false)} onCreado={cargar} />
       )}
       {modalDetalle && (
-        <ModalDetalle darkMode={darkMode} peligro={modalDetalle} onClose={() => setModalDetalle(null)} onRefresh={cargar} />
+        <ModalDetalle darkMode={darkMode} peligro={modalDetalle} initialTab={modalTab} onClose={() => setModalDetalle(null)} onRefresh={cargar} />
       )}
     </div>
   )

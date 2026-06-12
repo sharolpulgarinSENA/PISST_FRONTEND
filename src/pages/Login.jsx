@@ -235,7 +235,7 @@ import logoOscuro from '../assets/imagenes/logopisstCLaro-removebg-preview.png' 
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import api from '../services/api'
+import api, { usuariosAPI } from '../services/api'
 
 /* ══════════════════════════════════════════
    TRADUCCIONES (i18n simple, sin librería)
@@ -318,7 +318,7 @@ export default function Login() {
   const [captchaToken, setCaptchaToken] = useState(null)
   const captchaRef = useRef(null)
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, updateUser } = useAuth()
 
   // Tema global (persistido y compartido con toda la app)
   const { darkMode: dark, setDarkMode: setDark } = useTheme()
@@ -381,6 +381,14 @@ export default function Login() {
     const normalizedRole = role?.toString?.().toLowerCase?.()
 
     login(access_token, refresh_token, { role: normalizedRole, nombre, email: form.email })
+
+    // Cargar la foto de perfil de una vez para que el avatar se vea desde el primer momento
+    try {
+      const { data } = await usuariosAPI.getMe()
+      updateUser({ foto_url: data?.foto_url || null })
+    } catch {
+      // si falla, el avatar mostrará las iniciales y se cargará al visitar Perfil
+    }
 
     // ── Guardar el flag en sesión para que el guard de CambiarPassword lo lea ──
     if (debe_cambiar_password) {

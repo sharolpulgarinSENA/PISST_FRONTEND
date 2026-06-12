@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { Plus, X, ClipboardList, FileText, Search, Lightbulb, Pencil } from 'lucide-react'
-import { auditoriasAPI } from '../services/api'
+import { auditoriasAPI, getErrorMessage } from '../../../services/api'
 
 function getUsuarioId() {
   try {
@@ -83,7 +83,7 @@ function ModalNuevaAuditoria({ darkMode, onClose, onCreada }) {
       onCreada()
       onClose()
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al crear la auditoría.')
+      setBanner(getErrorMessage(err, 'Error al crear la auditoría.'))
     } finally { setLoading(false) }
   }
 
@@ -129,14 +129,14 @@ function ModalNuevaAuditoria({ darkMode, onClose, onCreada }) {
 /* ══════════════════════════════════════════
    MODAL: DETALLE AUDITORÍA
 ══════════════════════════════════════════ */
-function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
+function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onActualizada }) {
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
   const sub    = darkMode ? '#9CA3AF' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
-  const [tab, setTab]             = useState('info')
+  const [tab, setTab]             = useState(initialTab)
   const [hallazgos, setHallazgos] = useState([])
   const [progreso, setProgreso]   = useState(null)
   const [banner, setBanner]       = useState('')
@@ -166,7 +166,7 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
       onActualizada()
       setBanner('')
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al cambiar estado.')
+      setBanner(getErrorMessage(err, 'Error al cambiar estado.'))
     }
   }
 
@@ -188,7 +188,7 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
       setHallazgos(r.data)
       setHallazgoForm({ descripcion: '', clasificacion: '', evidencia: '', recomendacion: '' })
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al guardar hallazgo.')
+      setBanner(getErrorMessage(err, 'Error al guardar hallazgo.'))
     } finally { setLoading(false) }
   }
 
@@ -216,7 +216,7 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
       setNcTarget(null)
       setNcForm({ descripcion: '', fecha_limite: '' })
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al crear NC.')
+      setBanner(getErrorMessage(err, 'Error al crear NC.'))
     } finally { setLoading(false) }
   }
 
@@ -231,7 +231,7 @@ function ModalDetalle({ darkMode, auditoria, onClose, onActualizada }) {
       setEditingNcId(null)
       setBanner('')
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al actualizar NC.')
+      setBanner(getErrorMessage(err, 'Error al actualizar NC.'))
     } finally { setLoading(false) }
   }
 
@@ -492,7 +492,9 @@ export default function Auditorias() {
   const [loading, setLoading]           = useState(true)
   const [modalNuevo, setModalNuevo]     = useState(false)
   const [modalDetalle, setModalDetalle] = useState(null)
-  
+  const [modalTab, setModalTab]         = useState('info')
+  const [searchParams, setSearchParams] = useSearchParams()
+
   const cargar = () => {
     setLoading(true)
     auditoriasAPI.getAll()
@@ -502,6 +504,18 @@ export default function Auditorias() {
   }
 
   useEffect(() => { cargar() }, [])
+
+  // Deep link desde notificaciones: /auditorias?auditoria={id}&hallazgo=1
+  useEffect(() => {
+    const auditoriaId = searchParams.get('auditoria')
+    if (!auditoriaId || auditorias.length === 0) return
+    const encontrada = auditorias.find(a => String(a.id) === auditoriaId)
+    if (encontrada) {
+      setModalTab(searchParams.get('hallazgo') ? 'hallazgos' : 'info')
+      setModalDetalle(encontrada)
+    }
+    setSearchParams({})
+  }, [auditorias, searchParams])
 
   const auditoriasFiltradas = filtro === 'todas'
     ? auditorias
@@ -577,7 +591,7 @@ export default function Auditorias() {
         <ModalNuevaAuditoria darkMode={darkMode} onClose={() => setModalNuevo(false)} onCreada={cargar} />
       )}
       {modalDetalle && (
-        <ModalDetalle darkMode={darkMode} auditoria={modalDetalle}
+        <ModalDetalle darkMode={darkMode} auditoria={modalDetalle} initialTab={modalTab}
                       onClose={() => setModalDetalle(null)} onActualizada={cargar} />
       )}
     </div>

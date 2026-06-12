@@ -117,7 +117,7 @@
 //       onCreado()
 //       onClose()
 //     } catch (err) {
-//       setBannerErr(err.response?.data?.detail || 'Error al crear el reporte.')
+//       setBannerErr(getErrorMessage(err, 'Error al crear el reporte.'))
 //     } finally { setLoading(false) }
 //   }
 
@@ -271,7 +271,7 @@
 //       await incidentesAPI.cambiarEstado(reporte.id, nuevoEstado)
 //       onActualizado()
 //     } catch (err) {
-//       setBannerErr(err.response?.data?.detail || 'Error al cambiar estado.')
+//       setBannerErr(getErrorMessage(err, 'Error al cambiar estado.'))
 //     }
 //   }
 
@@ -294,7 +294,7 @@
 //       }
 //       setBannerOk('Investigación guardada correctamente.')
 //     } catch (err) {
-//       setBannerErr(err.response?.data?.detail || 'Error al guardar investigación.')
+//       setBannerErr(getErrorMessage(err, 'Error al guardar investigación.'))
 //     } finally { setLoadingInv(false) }
 //   }
 
@@ -330,7 +330,7 @@
 //       setAccion(ACCION_VACIA)
 //       setBannerOk('Acción correctiva registrada.')
 //     } catch (err) {
-//       setBannerErr(err.response?.data?.detail || 'Error al guardar la acción correctiva.')
+//       setBannerErr(getErrorMessage(err, 'Error al guardar la acción correctiva.'))
 //     } finally { setLoadingAccion(false) }
 //   }
 
@@ -711,7 +711,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { Plus, X, Download, AlertTriangle, CheckCircle, Pencil, FileText, Search, ClipboardList } from 'lucide-react'
-import { incidentesAPI } from '../services/api'
+import { incidentesAPI, getErrorMessage } from '../../../services/api'
+import { useAuth } from '../../../context/AuthContext'
 
 /* ── Extrae el UUID del usuario desde el JWT almacenado ──
    pisst_user no incluye id; el token sí lo trae en el claim "sub" */
@@ -747,6 +748,17 @@ const SEVERIDAD_COLOR = {
 const TIPO_LABEL = {
   accidente: 'Accidente', incidente: 'Incidente',
   condicion_insegura: 'Condición Insegura',
+}
+const ROL_LABEL = {
+  sst: 'Encargado SST', gerencia: 'Gerencia', empleado: 'Empleado',
+}
+
+/* Busca el primer campo no vacío entre varios nombres posibles del backend */
+function campoReporte(reporte, candidatos) {
+  for (const c of candidatos) {
+    if (reporte[c] !== undefined && reporte[c] !== null && reporte[c] !== '') return reporte[c]
+  }
+  return null
 }
 const ESTADO_ACCION_LABEL = {
   planificada:  'Planificada',
@@ -847,7 +859,7 @@ function ModalNuevoReporte({ darkMode, onClose, onCreado }) {
       onCreado()
       onClose()
     } catch (err) {
-      setBannerErr(err.response?.data?.detail || 'Error al crear el reporte.')
+      setBannerErr(getErrorMessage(err, 'Error al crear el reporte.'))
     } finally { setLoading(false) }
   }
 
@@ -874,6 +886,7 @@ function ModalNuevoReporte({ darkMode, onClose, onCreado }) {
                 <option value="">Seleccionar...</option>
                 <option value="accidente">Accidente</option>
                 <option value="incidente">Incidente</option>
+                <option value="cuasi_accidente">Cuasi Accidente</option>
                 <option value="condicion_insegura">Condición Insegura</option>
               </select>
             </div>
@@ -882,9 +895,11 @@ function ModalNuevoReporte({ darkMode, onClose, onCreado }) {
               <select value={form.severidad} onChange={e => set('severidad', e.target.value)}
                       className={inputClass('severidad')} style={{ backgroundColor: input, color: text }}>
                 <option value="">Seleccionar...</option>
+                <option value="sin_lesion">Sin Lesión</option>
                 <option value="leve">Leve</option>
                 <option value="moderada">Moderada</option>
                 <option value="grave">Grave</option>
+                <option value="mortal">Mortal</option>
               </select>
             </div>
           </div>
@@ -923,14 +938,14 @@ function ModalNuevoReporte({ darkMode, onClose, onCreado }) {
 /* ══════════════════════════════════════════
    MODAL: DETALLE DEL REPORTE
 ══════════════════════════════════════════ */
-function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
+function ModalDetalle({ darkMode, reporte, initialTab = 'info', onClose, onActualizado, readOnly = false }) {
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
   const sub    = darkMode ? '#9CA3AF' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
-  const [tab, setTab]             = useState('info')
+  const [tab, setTab]             = useState(initialTab)
   const [bannerErr, setBannerErr] = useState('')
   const [bannerOk, setBannerOk]   = useState('')
 
@@ -965,19 +980,21 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
 
   /* ── Carga inicial ── */
   const cargarDetalle = useCallback(async () => {
-    try {
-      const res = await incidentesAPI.getInvestigacion(reporte.id)
-      setInv({
-        metodo_analisis:         res.data.metodo_analisis         || '',
-        causas_inmediatas:       res.data.causas_inmediatas       || '',
-        causas_basicas:          res.data.causas_basicas          || '',
-        factores_contribuyentes: res.data.factores_contribuyentes || '',
-        descripcion_evento:      res.data.descripcion_evento      || '',
-        lecciones_aprendidas:    res.data.lecciones_aprendidas    || '',
-      })
-      setInvExiste(true)
-    } catch (err) {
-      if (err.response?.status !== 404) console.error('Error cargando investigación:', err)
+    if (!readOnly) {
+      try {
+        const res = await incidentesAPI.getInvestigacion(reporte.id)
+        setInv({
+          metodo_analisis:         res.data.metodo_analisis         || '',
+          causas_inmediatas:       res.data.causas_inmediatas       || '',
+          causas_basicas:          res.data.causas_basicas          || '',
+          factores_contribuyentes: res.data.factores_contribuyentes || '',
+          descripcion_evento:      res.data.descripcion_evento      || '',
+          lecciones_aprendidas:    res.data.lecciones_aprendidas    || '',
+        })
+        setInvExiste(true)
+      } catch (err) {
+        if (err.response?.status !== 404) console.error('Error cargando investigación:', err)
+      }
     }
 
     try {
@@ -987,7 +1004,7 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
       console.error('Error cargando acciones:', err)
       setAcciones([])
     }
-  }, [reporte.id])
+  }, [reporte.id, readOnly])
 
   useEffect(() => { cargarDetalle() }, [cargarDetalle])
 
@@ -1031,7 +1048,7 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
       cancelarEdicion()
       setBannerOk('Acción actualizada correctamente.')
     } catch (err) {
-      setBannerErr(err.response?.data?.detail || 'Error al actualizar la acción.')
+      setBannerErr(getErrorMessage(err, 'Error al actualizar la acción.'))
     } finally { setLoadingEdicion(false) }
   }
   
@@ -1050,7 +1067,7 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
       await incidentesAPI.cambiarEstado(reporte.id, nuevoEstado)
       onActualizado()
     } catch (err) {
-      setBannerErr(err.response?.data?.detail || 'Error al cambiar estado.')
+      setBannerErr(getErrorMessage(err, 'Error al cambiar estado.'))
     }
   }
 
@@ -1072,7 +1089,7 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
       }
       setBannerOk('Investigación guardada correctamente.')
     } catch (err) {
-      setBannerErr(err.response?.data?.detail || 'Error al guardar investigación.')
+      setBannerErr(getErrorMessage(err, 'Error al guardar investigación.'))
     } finally { setLoadingInv(false) }
   }
 
@@ -1102,7 +1119,7 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
       setAccion(ACCION_VACIA)
       setBannerOk('Acción correctiva registrada.')
     } catch (err) {
-      setBannerErr(err.response?.data?.detail || 'Error al guardar la acción correctiva.')
+      setBannerErr(getErrorMessage(err, 'Error al guardar la acción correctiva.'))
     } finally { setLoadingAccion(false) }
   }
 
@@ -1128,9 +1145,11 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
           .format(new Date(normFecha(f))) : '—'
 
   const tabs = [
-    { id: 'info',          label: 'Información',        Icon: FileText      },
-    { id: 'investigacion', label: 'Investigación',      Icon: Search        },
-    { id: 'acciones',      label: 'Acciones correctivas', Icon: ClipboardList },
+    { id: 'info',          label: 'Información',          labelCorta: 'Info',     Icon: FileText      },
+    ...(readOnly ? [] : [
+      { id: 'investigacion', label: 'Investigación',        labelCorta: 'Investig.', Icon: Search        },
+    ]),
+    { id: 'acciones',      label: 'Acciones correctivas', labelCorta: 'Acciones', Icon: ClipboardList },
   ]
 
   return (
@@ -1153,15 +1172,17 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b px-6" style={{ borderColor: border }}>
+        <div className="flex border-b px-2 sm:px-6 overflow-x-auto" style={{ borderColor: border }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => { setTab(t.id); clearBanners(); cancelarEdicion() }}
-                    className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition"
+                    className="flex items-center gap-1.5 px-2.5 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 transition shrink-0 whitespace-nowrap"
                     style={{
                       borderColor: tab === t.id ? '#6366F1' : 'transparent',
                       color:       tab === t.id ? '#6366F1' : sub,
                     }}>
-              <t.Icon className="w-4 h-4 shrink-0" />{t.label}
+              <t.Icon className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">{t.label}</span>
+              <span className="sm:hidden">{t.labelCorta}</span>
             </button>
           ))}
         </div>
@@ -1190,6 +1211,21 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
                 <p className="text-sm" style={{ color: text }}>{reporte.descripcion}</p>
               </div>
 
+              {(() => {
+                const nombre = campoReporte(reporte, ['creado_por_nombre', 'usuario_nombre', 'reportado_por_nombre', 'reportado_por'])
+                const rol    = campoReporte(reporte, ['creado_por_rol', 'usuario_rol', 'reportado_por_rol', 'rol_usuario'])
+                if (!nombre && !rol) return null
+                return (
+                  <div className="rounded-lg p-3" style={{ backgroundColor: input }}>
+                    <p className="text-xs mb-1" style={{ color: sub }}>Reportado por</p>
+                    <p className="text-sm font-medium" style={{ color: text }}>
+                      {nombre || '—'}
+                      {rol && <span className="ml-1.5 font-normal" style={{ color: sub }}>· {ROL_LABEL[rol] || rol}</span>}
+                    </p>
+                  </div>
+                )
+              })()}
+
               {reporte.lesion && (
                 <div className="rounded-lg p-3" style={{ backgroundColor: input }}>
                   <p className="text-xs font-medium mb-2" style={{ color: sub }}>Lesión registrada</p>
@@ -1201,34 +1237,47 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
                 </div>
               )}
 
-              <div>
-                <p className="text-xs font-medium mb-2" style={{ color: sub }}>Cambiar estado</p>
-                <div className="flex flex-wrap gap-2">
-                  {['borrador','en_revision','abierto','en_investigacion','cerrado'].map(e => (
-                    <button key={e} onClick={() => cambiarEstado(e)}
-                            className="text-xs px-3 py-1.5 rounded-lg font-medium transition hover:opacity-80"
-                            style={{
-                              backgroundColor: reporte.estado === e ? '#6366F1' : input,
-                              color:           reporte.estado === e ? '#fff' : text,
-                              border:          `1px solid ${border}`,
-                            }}>
-                      {ESTADO_LABEL[e]}
-                    </button>
-                  ))}
+              {readOnly ? (
+                <div className="rounded-lg p-3" style={{ backgroundColor: input }}>
+                  <p className="text-xs mb-1" style={{ color: sub }}>Estado actual</p>
+                  <Badge text={ESTADO_LABEL[reporte.estado] || reporte.estado}
+                         colorClass={ESTADO_COLOR[reporte.estado] || 'bg-gray-500/20 text-gray-300'} />
+                  <p className="text-xs mt-2" style={{ color: sub }}>
+                    El encargado de SST gestiona el seguimiento de este reporte.
+                  </p>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div>
+                    <p className="text-xs font-medium mb-2" style={{ color: sub }}>Cambiar estado</p>
+                    <div className="flex flex-wrap gap-2">
+                      {['borrador','en_revision','abierto','en_investigacion','cerrado'].map(e => (
+                        <button key={e} onClick={() => cambiarEstado(e)}
+                                className="text-xs px-3 py-1.5 rounded-lg font-medium transition hover:opacity-80"
+                                style={{
+                                  backgroundColor: reporte.estado === e ? '#6366F1' : input,
+                                  color:           reporte.estado === e ? '#fff' : text,
+                                  border:          `1px solid ${border}`,
+                                }}>
+                          {ESTADO_LABEL[e]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-              <button onClick={descargarFurat} disabled={loadingFurat}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white w-full justify-center disabled:opacity-50"
-                      style={{ backgroundColor: '#6366F1' }}>
-                <Download size={15} />
-                {loadingFurat ? 'Descargando...' : 'Descargar FURAT (PDF)'}
-              </button>
+                  <button onClick={descargarFurat} disabled={loadingFurat}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white w-full justify-center disabled:opacity-50"
+                          style={{ backgroundColor: '#6366F1' }}>
+                    <Download size={15} />
+                    {loadingFurat ? 'Descargando...' : 'Descargar FURAT (PDF)'}
+                  </button>
+                </>
+              )}
             </div>
           )}
 
           {/* ── TAB INVESTIGACIÓN ── */}
-          {tab === 'investigacion' && (
+          {!readOnly && tab === 'investigacion' && (
             <div className="space-y-4">
               {invExiste && !bannerOk && (
                 <div className="flex items-center gap-2 text-xs rounded-lg px-3 py-2"
@@ -1307,12 +1356,14 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
                                 colorClass={ESTADO_ACCION_COLOR[a.estado] || 'bg-gray-500/20 text-gray-300'}
                               />
                             )}
-                            <button onClick={() => { abrirEdicion(a); clearBanners() }}
-                                    className="p-1.5 rounded-lg hover:opacity-70 transition"
-                                    style={{ backgroundColor: card, border: `1px solid ${border}` }}
-                                    title="Editar acción">
-                              <Pencil size={13} style={{ color: sub }} />
-                            </button>
+                            {!readOnly && (
+                              <button onClick={() => { abrirEdicion(a); clearBanners() }}
+                                      className="p-1.5 rounded-lg hover:opacity-70 transition"
+                                      style={{ backgroundColor: card, border: `1px solid ${border}` }}
+                                      title="Editar acción">
+                                <Pencil size={13} style={{ color: sub }} />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1387,7 +1438,7 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
               )}
 
               {/* Formulario nueva acción — se oculta mientras se edita una existente */}
-              {!accionEditandoId && (
+              {!readOnly && !accionEditandoId && (
                 <div className="rounded-xl p-4 space-y-3"
                      style={{ backgroundColor: input, border: `1px solid ${border}` }}>
                   <p className="text-sm font-semibold" style={{ color: text }}>Nueva acción correctiva</p>
@@ -1434,6 +1485,8 @@ function ModalDetalle({ darkMode, reporte, onClose, onActualizado }) {
 ══════════════════════════════════════════ */
 export default function Incidentes() {
   const { darkMode } = useOutletContext()
+  const { user } = useAuth()
+  const esGerencia = user?.role?.toString?.().toLowerCase?.() === 'gerencia'
   const bg     = darkMode ? '#0B0F19' : '#F9FAFB'
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
@@ -1445,6 +1498,7 @@ export default function Incidentes() {
   const [loading, setLoading]           = useState(true)
   const [modalNuevo, setModalNuevo]     = useState(false)
   const [modalDetalle, setModalDetalle] = useState(null)
+  const [modalTab, setModalTab]         = useState('info')
   const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
@@ -1454,9 +1508,13 @@ export default function Incidentes() {
     }
   }, [searchParams])
 
+  // Deep link desde notificaciones: /incidentes?reporte={id}&tab=acciones|investigacion
   useEffect(() => {
     const reporteId = searchParams.get('reporte')
     if (reporteId) {
+      const tabParam = searchParams.get('tab')
+      if (tabParam === 'acciones' || (tabParam === 'investigacion' && !esGerencia)) setModalTab(tabParam)
+      else setModalTab('info')
       incidentesAPI.getById(reporteId)
         .then(r => setModalDetalle(r.data))
         .catch(console.error)
@@ -1474,9 +1532,19 @@ export default function Incidentes() {
 
   useEffect(() => { cargarReportes() }, [])
 
+  const reportesPropios = esGerencia
+    ? reportes.filter(r => {
+        const creadorId = campoReporte(r, ['creado_por_id', 'usuario_id', 'reportado_por_id'])
+        if (creadorId) return String(creadorId) === String(getUsuarioId())
+        // Fallback para reportes antiguos sin creado_por_id: comparamos por nombre
+        const creadorNombre = campoReporte(r, ['creado_por_nombre', 'usuario_nombre', 'reportado_por_nombre', 'reportado_por'])
+        return creadorNombre && creadorNombre === user?.nombre
+      })
+    : reportes
+
   const reportesFiltrados = filtro === 'todos'
-    ? reportes
-    : reportes.filter(r => r.estado === filtro)
+    ? reportesPropios
+    : reportesPropios.filter(r => r.estado === filtro)
 
   const fmtFechaCorta = (f) =>
     f ? new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', dateStyle: 'short' })
@@ -1487,9 +1555,11 @@ export default function Incidentes() {
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: text }}>Reportes</h1>
+          <h1 className="text-2xl font-bold" style={{ color: text }}>{esGerencia ? 'Mis reportes' : 'Reportes'}</h1>
           <p className="text-sm mt-0.5" style={{ color: sub }}>
-            {reportes.length} {reportes.length === 1 ? 'reporte registrado' : 'reportes registrados'}
+            {esGerencia
+              ? `${reportesPropios.length} ${reportesPropios.length === 1 ? 'reporte registrado por ti' : 'reportes registrados por ti'}`
+              : `${reportes.length} ${reportes.length === 1 ? 'reporte registrado' : 'reportes registrados'}`}
           </p>
         </div>
         <button onClick={() => setModalNuevo(true)}
@@ -1567,8 +1637,10 @@ export default function Incidentes() {
         <ModalDetalle
           darkMode={darkMode}
           reporte={modalDetalle}
+          initialTab={modalTab}
           onClose={() => setModalDetalle(null)}
           onActualizado={() => { cargarReportes(); setModalDetalle(null) }}
+          readOnly={esGerencia}
         />
       )}
     </div>

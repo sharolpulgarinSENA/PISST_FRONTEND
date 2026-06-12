@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Plus, X, UserCheck, UserX, Pencil, Building2, Briefcase, ChevronDown, AlertTriangle } from 'lucide-react'
-import { usuariosAPI, areasAPI, cargosAPI } from '../services/api'
+import { usuariosAPI, areasAPI, cargosAPI, getErrorMessage } from '../../../services/api'
 
 // SST solo puede crear empleados (backend bloquea sst/gerencia/admin con 403)
 const ROLES_CREAR = ['empleado']
+const TIPOS_VINCULACION = ['Empleado', 'Contratista', 'Practicante']
 const ROL_COLOR = {
   sst:      'bg-indigo-500/20 text-indigo-300',
   gerencia: 'bg-purple-500/20 text-purple-300',
@@ -121,7 +122,7 @@ function ModalGestionarOrg({ darkMode, onClose, onCambiado }) {
       onCambiado()
       mostrarOk('Área creada correctamente.')
     } catch (err) {
-      setBanner({ type: 'error', msg: err.response?.data?.detail || 'Error al crear el área.' })
+      setBanner({ type: 'error', msg: getErrorMessage(err, 'Error al crear el área.') })
     } finally { setLoading(false) }
   }
 
@@ -137,7 +138,7 @@ function ModalGestionarOrg({ darkMode, onClose, onCambiado }) {
       onCambiado()
       mostrarOk('Cargo creado correctamente.')
     } catch (err) {
-      setBanner({ type: 'error', msg: err.response?.data?.detail || 'Error al crear el cargo.' })
+      setBanner({ type: 'error', msg: getErrorMessage(err, 'Error al crear el cargo.') })
     } finally { setLoading(false) }
   }
 
@@ -298,7 +299,7 @@ function ModalNuevoUsuario({ darkMode, areas, cargos, loadingOrg, onClose, onCre
   const sub    = darkMode ? '#9CA3AF' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
-  const [form, setForm]       = useState({ nombre: '', email: '', area_id: '', cargo_id: '' })
+  const [form, setForm]       = useState({ nombre: '', email: '', area_id: '', cargo_id: '', tipo_vinculacion: '' })
   const [errores, setErrores] = useState({})
   const [banner, setBanner]   = useState('')
   const [loading, setLoading] = useState(false)
@@ -333,20 +334,20 @@ function ModalNuevoUsuario({ darkMode, areas, cargos, loadingOrg, onClose, onCre
       const areaSel  = areas.find(a => a.id === form.area_id)
       const cargoSel = cargos.find(c => c.id === form.cargo_id)
       await usuariosAPI.create({
-        nombre:       form.nombre,
-        email:        form.email,
-        role:         'empleado',
-        area_nombre:  areaSel?.nombre  || undefined,
-        cargo_nombre: cargoSel?.nombre || undefined,
+        nombre:           form.nombre,
+        email:            form.email,
+        role:             'empleado',
+        area_nombre:      areaSel?.nombre  || undefined,
+        cargo_nombre:     cargoSel?.nombre || undefined,
+        tipo_vinculacion: form.tipo_vinculacion || undefined,
       })
       onCreado()
       onClose()
     } catch (err) {
-      const detail = err.response?.data?.detail || ''
       if (err.response?.status === 403) {
         setBanner('No tienes permiso para crear usuarios con ese rol.')
       } else {
-        setBanner(detail || 'Error al crear el usuario.')
+        setBanner(getErrorMessage(err, 'Error al crear el usuario.'))
       }
     } finally { setLoading(false) }
   }
@@ -414,6 +415,16 @@ function ModalNuevoUsuario({ darkMode, areas, cargos, loadingOrg, onClose, onCre
             </div>
           </div>
 
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Tipo de vinculación</label>
+            <select value={form.tipo_vinculacion} onChange={e => set('tipo_vinculacion', e.target.value)}
+                    className="w-full rounded-lg px-3 py-2.5 text-sm outline-none border border-transparent"
+                    style={{ backgroundColor: input, color: text }}>
+              <option value="">Sin especificar</option>
+              {TIPOS_VINCULACION.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+
           <div className="rounded-lg px-4 py-3 text-xs" style={{ backgroundColor: input, color: sub }}>
             ℹ️ Se enviará una contraseña temporal al correo del usuario.
           </div>
@@ -445,7 +456,7 @@ function ModalEditarUsuario({ darkMode, usuario, areas, cargos, loadingOrg, onCl
   const areaInicial  = areas.find(a => a.nombre === usuario.area_nombre)?.id  ?? ''
   const cargoInicial = cargos.find(c => c.nombre === usuario.cargo_nombre)?.id ?? ''
 
-  const [form, setForm]     = useState({ nombre: usuario.nombre, activo: usuario.activo, area_id: areaInicial, cargo_id: cargoInicial })
+  const [form, setForm]     = useState({ nombre: usuario.nombre, activo: usuario.activo, area_id: areaInicial, cargo_id: cargoInicial, tipo_vinculacion: usuario.tipo_vinculacion || '' })
   const [banner, setBanner] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -468,15 +479,16 @@ function ModalEditarUsuario({ darkMode, usuario, areas, cargos, loadingOrg, onCl
       const areaSel  = areas.find(a => a.id === form.area_id)
       const cargoSel = cargos.find(c => c.id === form.cargo_id)
       await usuariosAPI.update(usuario.id, {
-        nombre:       form.nombre,
-        activo:       form.activo,
-        area_nombre:  areaSel?.nombre  || undefined,
-        cargo_nombre: cargoSel?.nombre || undefined,
+        nombre:           form.nombre,
+        activo:           form.activo,
+        area_nombre:      areaSel?.nombre  || undefined,
+        cargo_nombre:     cargoSel?.nombre || undefined,
+        tipo_vinculacion: form.tipo_vinculacion || undefined,
       })
       onActualizado()
       onClose()
     } catch (err) {
-      setBanner(err.response?.data?.detail || 'Error al actualizar el usuario.')
+      setBanner(getErrorMessage(err, 'Error al actualizar el usuario.'))
     } finally { setLoading(false) }
   }
 
@@ -514,6 +526,16 @@ function ModalEditarUsuario({ darkMode, usuario, areas, cargos, loadingOrg, onCl
             <SelectDB value={form.cargo_id} onChange={v => set('cargo_id', v)} items={cargosFiltrados}
                       placeholder="Sin cargo asignado" loading={loadingOrg} darkMode={darkMode}
                       disabled={!form.area_id} />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Tipo de vinculación</label>
+            <select value={form.tipo_vinculacion} onChange={e => set('tipo_vinculacion', e.target.value)}
+                    className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                    style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }}>
+              <option value="">Sin especificar</option>
+              {TIPOS_VINCULACION.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
           </div>
 
           <div className="flex items-center justify-between">
@@ -671,6 +693,7 @@ export default function Usuarios() {
                       <div className="space-y-0.5">
                         {u.area_nombre  && <p className="text-xs font-medium" style={{ color: text }}>{u.area_nombre}</p>}
                         {u.cargo_nombre && <p className="text-xs" style={{ color: sub }}>{u.cargo_nombre}</p>}
+                        {u.tipo_vinculacion && <p className="text-xs" style={{ color: sub }}>{u.tipo_vinculacion}</p>}
                         {!u.area_nombre && !u.cargo_nombre && <p className="text-xs" style={{ color: sub }}>—</p>}
                       </div>
                     </td>

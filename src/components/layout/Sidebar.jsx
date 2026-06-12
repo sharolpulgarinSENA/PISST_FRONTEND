@@ -9,7 +9,7 @@ import logo from '../../assets/imagenes/pisst_logo.png'
 import logoMini from '../../assets/imagenes/sincasco-removebg-preview.png'
 import { useAuth } from '../../context/AuthContext'
 
-const navItems = [
+const navItemsSST = [
   { icon: LayoutDashboard, label: 'Dashboard',             path: '/dashboard' },
   { icon: AlertTriangle,   label: 'Reportes',              path: '/incidentes' },
   { icon: ShieldAlert,     label: 'Evaluación de Riesgos', path: '/riesgos' },
@@ -19,11 +19,20 @@ const navItems = [
   { icon: Settings,        label: 'Configuración',         path: '/configuracion' },
 ]
 
+const navItemsGerencia = [
+  { icon: LayoutDashboard, label: 'Dashboard',    path: '/dashboard'  },
+  { icon: AlertTriangle,   label: 'Mis reportes', path: '/incidentes' },
+]
+
 export default function Sidebar({ open, onClose }) {
   const [collapsed, setCollapsed] = useState(false)
   const navigate  = useNavigate()
   const location  = useLocation()
   const { user, logout } = useAuth()
+
+  const navItems = user?.role?.toString?.().toLowerCase?.() === 'gerencia'
+    ? navItemsGerencia
+    : navItemsSST
 
   const handleNav = (path) => {
     navigate(path)

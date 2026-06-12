@@ -91,6 +91,19 @@ api.interceptors.response.use(
 
 export default api;
 
+// ─── Helper: extrae un mensaje legible de errores de la API ───────────────────
+// El backend ahora valida más casos con 422, cuyo `detail` puede venir como
+// string o como lista de objetos { msg, loc, type } (errores de Pydantic).
+export function getErrorMessage(err, fallback) {
+  const detail = err.response?.data?.detail;
+  if (!detail) return fallback;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((d) => d.msg).filter(Boolean).join(" · ") || fallback;
+  }
+  return fallback;
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authAPI = {
   cambiarPassword: (data) => api.post("/auth/cambiar-password", data),
@@ -190,6 +203,15 @@ export const notificacionesAPI = {
   getFeed:          (limit = 10, offset = 0) => api.get("/notificaciones/feed", { params: { limit, offset } }),
   marcarLeido:      (id)                     => api.patch(`/notificaciones/${id}/leido`),
   marcarTodasLeidas:()                       => api.patch("/notificaciones/leer-todas"),
+};
+
+// ─── Chat SASBOT ──────────────────────────────────────────────────────────────
+export const chatAPI = {
+  enviarMensaje: (mensaje)         => api.post("/chat/mensaje", { mensaje }),
+  getHistorial:  (pagina = 1, limite = 20) => api.get("/chat/historial", { params: { pagina, limite } }),
+  escalar:       ()                => api.post("/chat/escalar"),
+  enviarArchivo: (formData)        => api.post("/chat/archivo", formData, { headers: { "Content-Type": "multipart/form-data" } }),
+  reporteRapido: (data)            => api.post("/chat/reporte-rapido", data),
 };
 
 // ─── Auditorías ───────────────────────────────────────────────────────────────
