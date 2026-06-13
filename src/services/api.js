@@ -188,6 +188,7 @@ export const capacitacionesAPI = {
   crearEvaluacion:     (data)             => api.post("/capacitaciones/evaluaciones", data),
   responderEvaluacion: (data)             => api.post("/capacitaciones/evaluaciones/responder", data),
   getCertificado:      (evalId, empId)    => api.get(`/capacitaciones/evaluaciones/${evalId}/certificado/${empId}`, { responseType: "blob" }),
+  getHistorialEmpleado:(empId)            => api.get(`/capacitaciones/empleados/${empId}/historial`),
 };
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
