@@ -16,6 +16,12 @@ const ResetPassword  = lazy(() => import('./pages/ResetPassword'))
 const CambiarPassword = lazy(() => import('./pages/CambiarPassword'))
 const Mantenimiento  = lazy(() => import('./pages/Mantenimiento'))
 
+const EmpleadoLayout         = lazy(() => import('./features/empleado/pages/EmpleadoLayout'))
+const EmpleadoChat           = lazy(() => import('./features/empleado/pages/EmpleadoChat'))
+const EmpleadoReporte        = lazy(() => import('./features/empleado/pages/EmpleadoReporte'))
+const EmpleadoPerfil         = lazy(() => import('./features/empleado/pages/EmpleadoPerfil'))
+const EmpleadoCapacitaciones = lazy(() => import('./features/empleado/pages/EmpleadoCapacitaciones'))
+
 function PrivateRoute({ children, roles }) {
   const { token, user } = useAuth()
   if (!token) return <Navigate to="/login" replace />
@@ -48,7 +54,7 @@ export default function App() {
         <PrivateRoute>
           {userRole === 'sst'      ? <Navigate to="/dashboard" replace /> :
            userRole === 'gerencia' ? <Navigate to="/dashboard" replace /> :
-           userRole === 'empleado' ? <Navigate to="/chat" replace /> :
+           userRole === 'empleado' ? <Navigate to="/empleado/chat" replace /> :
            <Navigate to="/login" replace />}
         </PrivateRoute>
       }/>
@@ -63,6 +69,15 @@ export default function App() {
         <Route path="/auditorias"     element={<PrivateRoute roles={['sst']}><Auditorias /></PrivateRoute>} />
         <Route path="/usuarios"       element={<PrivateRoute roles={['sst']}><Usuarios /></PrivateRoute>} />
         <Route path="/perfil"         element={<PrivateRoute><PerfilSST /></PrivateRoute>} />
+      </Route>
+
+      {/* ── Páginas del rol empleado (layout propio) ── */}
+      <Route path="/empleado" element={<PrivateRoute roles={['empleado']}><EmpleadoLayout /></PrivateRoute>}>
+        <Route index               element={<Navigate to="chat" replace />} />
+        <Route path="chat"          element={<EmpleadoChat />} />
+        <Route path="reporte"       element={<EmpleadoReporte />} />
+        <Route path="perfil"        element={<EmpleadoPerfil />} />
+        <Route path="capacitaciones" element={<EmpleadoCapacitaciones />} />
       </Route>
 
       {/* ── Catch-all ── */}
