@@ -157,9 +157,10 @@ export default function EmpleadoLayout() {
     : SEARCH_DESTINOS
 
   const irABusqueda = (path) => {
-    navigate(path)
+    busquedaRef.current?.querySelector('input')?.blur()
     setBusqueda('')
     setBusquedaAbierta(false)
+    navigate(path)
   }
 
   // Cargar notificaciones — defensivo contra cualquier forma del response

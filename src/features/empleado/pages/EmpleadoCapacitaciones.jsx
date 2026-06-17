@@ -6,6 +6,7 @@ import {
   BarChart2, AlertCircle, Loader, RefreshCw, FileText
 } from 'lucide-react'
 import { capacitacionesAPI } from '../../../services/api'
+import { normFecha } from '../../../utils/dates'
 import { useAuth } from '../../../context/AuthContext'
 import Spinner from '../../../components/Spinner'
 
