@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import {
-  Search, Moon, Sun, Bell, ChevronDown, User, Settings, LogOut, Menu, X,
+  Search, Moon, Sun, Bell, ChevronDown, User, LogOut, X,
   AlertOctagon, AlertTriangle, RefreshCw, BookOpen, Calendar, CheckCircle,
   Clock, XCircle, ShieldAlert, ClipboardList, CheckSquare, FileSearch, FileCheck,
 } from 'lucide-react'
+import ConfirmDialog from '../ConfirmDialog'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { metricasAPI, notificacionesAPI } from '../../services/api'
+import { normFecha, tiempoRelativo } from '../../utils/dates'
 
 const NOTIF_LIMIT = 10
 
@@ -36,30 +38,17 @@ const ICONOS_EVENTO = {
   riesgo_control_proximo_vencer:    Clock,
 }
 
-function normFecha(f) {
-  if (!f) return ''
-  return f.endsWith('Z') || f.includes('+') || /[+-]\d{2}:\d{2}$/.test(f) ? f : f + 'Z'
-}
+const SEARCH_DESTINOS = [
+  { label: 'Dashboard',      path: '/dashboard',      roles: ['sst', 'gerencia'], keywords: 'inicio dashboard resumen' },
+  { label: 'SASBOT (Chat)',  path: '/chat',           roles: ['sst', 'gerencia'], keywords: 'chat sasbot asistente ia' },
+  { label: 'Reportes',       path: '/incidentes',     roles: ['sst', 'gerencia'], keywords: 'incidentes reportes accidentes' },
+  { label: 'Capacitaciones', path: '/capacitaciones', roles: ['sst'],             keywords: 'capacitaciones formaciones cursos' },
+  { label: 'Riesgos',        path: '/riesgos',        roles: ['sst'],             keywords: 'riesgos matriz peligros' },
+  { label: 'Auditorías',     path: '/auditorias',     roles: ['sst'],             keywords: 'auditorias hallazgos' },
+  { label: 'Usuarios',       path: '/usuarios',       roles: ['sst'],             keywords: 'usuarios empleados personas' },
+  { label: 'Mi perfil',      path: '/perfil',         roles: ['sst', 'gerencia'], keywords: 'perfil cuenta contraseña foto' },
+]
 
-function tiempoRelativo(fechaStr) {
-  const fecha = new Date(normFecha(fechaStr))
-  const ahora = new Date()
-  const diffMs = ahora - fecha
-  const diffMin = Math.floor(diffMs / 60000)
-  const diffHrs = Math.floor(diffMs / 3600000)
-
-  if (diffMin < 1)  return 'Ahora mismo'
-  if (diffMin < 60) return `Hace ${diffMin} min`
-  if (diffHrs < 24) return `Hace ${diffHrs} h`
-
-  const ayer = new Date(ahora)
-  ayer.setDate(ayer.getDate() - 1)
-  if (fecha.toDateString() === ayer.toDateString()) return 'Ayer'
-
-  return new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota', dateStyle: 'medium',
-  }).format(fecha)
-}
 
 export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMenuClick }) {
   const [dropdown, setDropdown] = useState(false)
@@ -67,6 +56,35 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const esGerencia = user?.role?.toString?.().toLowerCase?.() === 'gerencia'
+  const rolActual = user?.role?.toString?.().toLowerCase?.()
+
+  /* ── Búsqueda ── */
+  const [busqueda, setBusqueda] = useState('')
+  const mobileSearchRef = useRef(null)
+  const desktopSearchRef = useRef(null)
+
+  const opcionesBusqueda = SEARCH_DESTINOS.filter(d => d.roles.includes(rolActual))
+  const resultadosBusqueda = busqueda.trim()
+    ? opcionesBusqueda.filter(d => {
+        const q = busqueda.trim().toLowerCase()
+        return d.label.toLowerCase().includes(q) || d.keywords.includes(q)
+      })
+    : opcionesBusqueda
+
+  function irABusqueda(path) {
+    navigate(path)
+    setBusqueda('')
+    setMobileSearchOpen(false)
+  }
+
+  function manejarEnterBusqueda(e) {
+    if (e.key === 'Enter' && resultadosBusqueda.length > 0) {
+      irABusqueda(resultadosBusqueda[0].path)
+    } else if (e.key === 'Escape') {
+      setBusqueda('')
+      setMobileSearchOpen(false)
+    }
+  }
 
   /* ── Usuario ── */
   const userRef = useRef(null)
@@ -96,6 +114,12 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
       }
       if (userRef.current && !userRef.current.contains(e.target)) {
         setDropdown(false)
+      }
+      if (mobileSearchRef.current && !mobileSearchRef.current.contains(e.target)) {
+        setMobileSearchOpen(false)
+      }
+      if (desktopSearchRef.current && !desktopSearchRef.current.contains(e.target)) {
+        setBusqueda('')
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -168,6 +192,9 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
 
   const noLeidos   = eventos.filter((e) => !e.leido).length
   const badgeCount = totalAlertas + noLeidos
+  const badgeColor = totalAlertas > 0 ? '#EF4444' : noLeidos > 0 ? '#F97316' : '#6366F1'
+
+  const [confirmLogout, setConfirmLogout] = useState(false)
 
   return (
     <div
@@ -183,7 +210,8 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
         <button
           onClick={onMenuClick}
           className="lg:hidden mr-3"
-          style={{ color: darkMode ? '#9CA3AF' : '#6B7280' }}
+          style={{ color: darkMode ? '#CBD5E1' : '#6B7280' }}
+          aria-label="Abrir menú"
         >
           <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -191,13 +219,13 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
         </button>
 
         {/* 🔍 BÚSQUEDA — Versión MOBILE: solo icono que despliega input */}
-        <div className="md:hidden relative">
+        <div className="md:hidden relative" ref={mobileSearchRef}>
           <button
             onClick={() => setMobileSearchOpen(v => !v)}
             className="p-2 rounded-lg transition hover:opacity-80"
             style={{
               backgroundColor: darkMode ? '#111827' : '#F3F4F6',
-              color: '#9CA3AF'
+              color: '#CBD5E1'
             }}
             aria-label="Buscar"
           >
@@ -206,7 +234,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
 
           {mobileSearchOpen && (
             <div
-              className="absolute left-0 top-12 z-50 rounded-lg shadow-xl p-2 flex items-center gap-2"
+              className="absolute left-0 top-12 z-50 rounded-lg shadow-xl"
               style={{
                 backgroundColor: darkMode ? '#111827' : '#FFFFFF',
                 border: `1px solid ${darkMode ? '#1F2937' : '#E5E7EB'}`,
@@ -214,73 +242,105 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
                 maxWidth: '320px'
               }}
             >
-              <Search size={15} style={{ color: '#9CA3AF' }} />
-              <input
-                type="text"
-                autoFocus
-                placeholder="Buscar en PISST..."
-                className="bg-transparent text-sm outline-none flex-1 min-w-0"
-                style={{ color: darkMode ? '#E5E7EB' : '#111827' }}
-              />
-              <button onClick={() => setMobileSearchOpen(false)}>
-                <X size={16} style={{ color: '#9CA3AF' }} />
-              </button>
+              <div className="p-2 flex items-center gap-2">
+                <Search size={15} style={{ color: '#CBD5E1' }} />
+                <input
+                  type="text"
+                  autoFocus
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                  onKeyDown={manejarEnterBusqueda}
+                  placeholder="Buscar en PISST..."
+                  className="bg-transparent text-sm outline-none flex-1 min-w-0"
+                  style={{ color: darkMode ? '#E5E7EB' : '#111827' }}
+                />
+                <button onClick={() => { setMobileSearchOpen(false); setBusqueda('') }}>
+                  <X size={16} style={{ color: '#CBD5E1' }} />
+                </button>
+              </div>
+              <div className="max-h-60 overflow-y-auto" style={{ borderTop: `1px solid ${darkMode ? '#1F2937' : '#E5E7EB'}` }}>
+                {resultadosBusqueda.length === 0 ? (
+                  <div className="px-3 py-2 text-sm" style={{ color: '#CBD5E1' }}>Sin resultados</div>
+                ) : resultadosBusqueda.map(d => (
+                  <div
+                    key={d.path}
+                    onClick={() => irABusqueda(d.path)}
+                    className="px-3 py-2 text-sm cursor-pointer transition hover:opacity-80"
+                    style={{ color: darkMode ? '#E5E7EB' : '#111827' }}
+                  >
+                    {d.label}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
         {/* 🔍 BÚSQUEDA — Versión DESKTOP/TABLET: barra completa */}
-        <div
-          className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg"
-          style={{
-            backgroundColor: darkMode ? '#111827' : '#F3F4F6',
-            width: '320px'
-          }}
-        >
-          <Search size={15} style={{ color: '#9CA3AF' }} />
-          <input
-            type="text"
-            placeholder="Buscar en PISST..."
-            className="bg-transparent text-sm outline-none w-full min-w-0"
-            style={{ color: darkMode ? '#E5E7EB' : '#111827' }}
-          />
-          <span
-            className="text-xs px-1.5 py-0.5 rounded shrink-0"
+        <div className="hidden md:block relative" ref={desktopSearchRef} style={{ width: '320px' }}>
+          <div
+            className="flex items-center gap-2 px-4 py-2 rounded-lg"
             style={{
-              backgroundColor: darkMode ? '#1F2937' : '#E5E7EB',
-              color: '#9CA3AF'
+              backgroundColor: darkMode ? '#111827' : '#F3F4F6',
+              width: '100%'
             }}
           >
-            Ctrl+K
-          </span>
+            <Search size={15} style={{ color: '#CBD5E1' }} />
+            <input
+              type="text"
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              onKeyDown={manejarEnterBusqueda}
+              placeholder="Buscar en PISST..."
+              className="bg-transparent text-sm outline-none w-full min-w-0"
+              style={{ color: darkMode ? '#E5E7EB' : '#111827' }}
+            />
+            {busqueda && (
+              <button onClick={() => setBusqueda('')}>
+                <X size={14} style={{ color: '#CBD5E1' }} />
+              </button>
+            )}
+          </div>
+
+          {busqueda && (
+            <div
+              className="absolute left-0 top-12 z-50 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+              style={{
+                backgroundColor: darkMode ? '#111827' : '#FFFFFF',
+                border: `1px solid ${darkMode ? '#1F2937' : '#E5E7EB'}`,
+                width: '100%'
+              }}
+            >
+              {resultadosBusqueda.length === 0 ? (
+                <div className="px-3 py-2 text-sm" style={{ color: '#CBD5E1' }}>Sin resultados</div>
+              ) : resultadosBusqueda.map(d => (
+                <div
+                  key={d.path}
+                  onClick={() => irABusqueda(d.path)}
+                  className="px-3 py-2 text-sm cursor-pointer transition hover:opacity-80"
+                  style={{ color: darkMode ? '#E5E7EB' : '#111827' }}
+                >
+                  {d.label}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* ============ CENTRO: Acciones rápidas (solo desktop) ============ */}
       <div className="hidden md:flex items-center gap-2">
-        {(esGerencia ? [
-          { label: 'Dashboard',     path: '/dashboard' },
-          { label: 'Nuevo reporte', path: '/incidentes?nuevo=true' },
-          { label: 'Mis reportes',  path: '/incidentes' },
-        ] : [
-          { label: 'Nuevo reporte',        path: '/incidentes?nuevo=true' },
-          { label: 'Capacitaciones',       path: '/capacitaciones' },
-          { label: 'Evaluación de Riesgos',path: '/riesgos' },
-          { label: 'Auditorías',           path: '/auditorias' },
-        ]).map(({ label, path }) => (
-          <button
-            key={label}
-            onClick={() => navigate(path)}
-            className="text-xs px-3 py-1.5 rounded-lg font-medium transition hover:opacity-80"
-            style={{
-              backgroundColor: darkMode ? '#1A1F33' : '#F3F4F6',
-              color: darkMode ? '#E5E7EB' : '#374151',
-              border: `1px solid ${darkMode ? '#1F2937' : '#E5E7EB'}`
-            }}
-          >
-            {label}
-          </button>
-        ))}
+        <button
+          onClick={() => navigate('/incidentes?nuevo=true')}
+          className="text-xs px-3 py-1.5 rounded-lg font-medium transition hover:opacity-80"
+          style={{
+            backgroundColor: darkMode ? '#1A1F33' : '#F3F4F6',
+            color: darkMode ? '#E5E7EB' : '#374151',
+            border: `1px solid ${darkMode ? '#1F2937' : '#E5E7EB'}`
+          }}
+        >
+          + Nuevo reporte
+        </button>
       </div>
 
       {/* ============ DERECHA: toggle + notificaciones + usuario ============ */}
@@ -296,7 +356,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
             className="flex items-center gap-1 px-2 py-1 rounded-md text-xs transition"
             style={{
               backgroundColor: darkMode ? '#1F2937' : 'transparent',
-              color: darkMode ? '#E5E7EB' : '#9CA3AF'
+              color: darkMode ? '#E5E7EB' : '#CBD5E1'
             }}
           >
             <Moon size={13} /> Dark
@@ -306,7 +366,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
             className="flex items-center gap-1 px-2 py-1 rounded-md text-xs transition"
             style={{
               backgroundColor: !darkMode ? '#E5E7EB' : 'transparent',
-              color: !darkMode ? '#111827' : '#9CA3AF'
+              color: !darkMode ? '#111827' : '#CBD5E1'
             }}
           >
             <Sun size={13} /> Light
@@ -334,14 +394,16 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
               return !v
             })}
             className="relative p-1"
-            style={{ color: '#9CA3AF' }}
+            style={{ color: '#CBD5E1' }}
             aria-label="Notificaciones"
+            aria-expanded={panelOpen}
+            aria-haspopup="true"
           >
             <Bell size={18} />
             {badgeCount > 0 && (
               <span
                 className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full text-white text-[10px] flex items-center justify-center"
-                style={{ backgroundColor: '#6366F1' }}
+                style={{ backgroundColor: badgeColor }}
               >
                 {badgeCount > 9 ? '9+' : badgeCount}
               </span>
@@ -376,7 +438,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
 
               <div className="overflow-y-auto flex-1">
                 {loadingNotif ? (
-                  <p className="text-center text-sm py-8" style={{ color: '#9CA3AF' }}>Cargando...</p>
+                  <p className="text-center text-sm py-8" style={{ color: '#CBD5E1' }}>Cargando...</p>
                 ) : (
                   <>
                     {/* Sección A — Alertas del sistema */}
@@ -404,7 +466,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
 
                     {/* Sección B — Feed de eventos */}
                     {eventos.length === 0 ? (
-                      <p className="text-center text-sm py-8" style={{ color: '#9CA3AF' }}>
+                      <p className="text-center text-sm py-8" style={{ color: '#CBD5E1' }}>
                         No tienes notificaciones.
                       </p>
                     ) : (
@@ -428,10 +490,10 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
                               <p className="text-sm font-medium" style={{ color: darkMode ? '#F9FAFB' : '#111827' }}>
                                 {ev.titulo}
                               </p>
-                              <p className="text-xs mt-0.5 line-clamp-2" style={{ color: '#9CA3AF' }}>
+                              <p className="text-xs mt-0.5 line-clamp-2" style={{ color: '#CBD5E1' }}>
                                 {ev.descripcion}
                               </p>
-                              <p className="text-[11px] mt-1" style={{ color: '#9CA3AF' }}>
+                              <p className="text-[11px] mt-1" style={{ color: '#CBD5E1' }}>
                                 {tiempoRelativo(ev.fecha)}
                               </p>
                               {esReporteNuevo && (
@@ -488,11 +550,11 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
               <p className="text-sm font-semibold" style={{ color: darkMode ? '#E5E7EB' : '#111827' }}>
                 {user?.nombre || 'Usuario'}
               </p>
-              <p className="text-xs capitalize" style={{ color: '#9CA3AF' }}>
+              <p className="text-xs capitalize" style={{ color: '#CBD5E1' }}>
                 {user?.role || ''}
               </p>
             </div>
-            <ChevronDown size={14} className="hidden lg:block" style={{ color: '#9CA3AF' }} />
+            <ChevronDown size={14} className="hidden lg:block" style={{ color: '#CBD5E1' }} />
           </button>
 
           {dropdown && (
@@ -520,7 +582,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
                   <p className="text-sm font-semibold truncate" style={{ color: darkMode ? '#F9FAFB' : '#111827' }}>
                     {user?.nombre || 'Usuario'}
                   </p>
-                  <p className="text-xs capitalize" style={{ color: '#9CA3AF' }}>
+                  <p className="text-xs capitalize" style={{ color: '#CBD5E1' }}>
                     {user?.role || ''}
                   </p>
                 </div>
@@ -528,7 +590,6 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
 
               {[
                 { icon: User, label: 'Perfil', path: '/perfil' },
-                { icon: Settings, label: 'Configuración', path: null },
               ].map(({ icon: Icon, label, path }) => (
                 <button
                   key={label}
@@ -545,7 +606,7 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
                 style={{ borderColor: darkMode ? '#1F2937' : '#E5E7EB' }}
               />
               <button
-                onClick={() => { logout(); navigate('/login') }}
+                onClick={() => { setDropdown(false); setConfirmLogout(true) }}
                 className="flex items-center gap-3 w-full px-4 py-2.5 text-sm"
                 style={{ color: '#EF4444' }}
               >
@@ -556,6 +617,16 @@ export default function Navbar({ darkMode, setDarkMode, onHamburguerClick, onMen
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmLogout}
+        title="¿Cerrar sesión?"
+        message="Se cerrará tu sesión actual. Asegúrate de haber guardado los cambios pendientes."
+        confirmLabel="Cerrar sesión"
+        danger
+        onConfirm={() => { setConfirmLogout(false); logout(); navigate('/login') }}
+        onCancel={() => setConfirmLogout(false)}
+      />
     </div>
   )
 }

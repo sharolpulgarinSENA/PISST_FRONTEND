@@ -1,41 +1,23 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { useTheme } from '../../../context/ThemeContext'
 import {
   Plus, X, BookOpen, ChevronDown, Check, Power, PowerOff, Calendar, MapPin,
-  Users, CheckCircle, XCircle, AlertCircle, RotateCcw, Ban,
-  ClipboardList, Trash2, GraduationCap, Info, Pencil, Clock
+  Users, CheckCircle, XCircle, AlertCircle, AlertTriangle, RotateCcw, Ban,
+  ClipboardList, Trash2, GraduationCap, Info, Pencil, Clock, Loader2
 } from 'lucide-react'
 import { capacitacionesAPI, areasAPI, usuariosAPI, getErrorMessage } from '../../../services/api'
+import { normFecha, toColombiaISO, formatColombia, backendToInputLocal } from '../../../utils/dates'
+import { usePaginacion } from '../../../hooks/usePaginacion'
+import Paginador from '../../../components/Paginador'
+import ConfirmDialog from '../../../components/ConfirmDialog'
 
 /* ══════════════════════════════════════════
    UTILS (sin cambios)
 ══════════════════════════════════════════ */
-function toColombiaISO(datetimeLocal) {
-  if (!datetimeLocal) return null
-  const withSeconds = datetimeLocal.length === 16 ? `${datetimeLocal}:00` : datetimeLocal
-  return `${withSeconds}-05:00`
-}
-
-function formatColombia(fechaStr, opts = { dateStyle: 'medium', timeStyle: 'short' }) {
-  if (!fechaStr) return ''
-  const normalized = /[Z+\-]\d{2}:\d{2}$|Z$/.test(fechaStr) ? fechaStr : fechaStr + 'Z'
-  return new Intl.DateTimeFormat('es-CO', { ...opts, timeZone: 'America/Bogota' }).format(new Date(normalized))
-}
-
-function backendToInputLocal(raw) {
-  if (!raw) return ''
-  const normalized = /[Z+\-]\d{2}:\d{2}$|Z$/.test(raw) ? raw : raw + 'Z'
-  const fmt = new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota', year: 'numeric', month: '2-digit',
-    day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  })
-  const p = Object.fromEntries(fmt.formatToParts(new Date(normalized)).map(x => [x.type, x.value]))
-  return `${p.year}-${p.month}-${p.day}T${p.hour === '24' ? '00' : p.hour}:${p.minute}`
-}
-
 function estadoSesion(s) {
   const estado = s.estado || 'programada'
-  if (estado === 'cancelada')    return { key: 'cancelada',    label: 'Cancelada',           color: '#9CA3AF', bg: 'rgba(107,114,128,0.15)' }
+  if (estado === 'cancelada')    return { key: 'cancelada',    label: 'Cancelada',           color: '#CBD5E1', bg: 'rgba(107,114,128,0.15)' }
   if (estado === 'realizada')    return { key: 'realizada',    label: 'Realizada',            color: '#22C55E', bg: 'rgba(34,197,94,0.12)'   }
   if (estado === 'no_realizada') return { key: 'no_realizada', label: 'No realizada',         color: '#EF4444', bg: 'rgba(239,68,68,0.12)'   }
   const normalized = /[Z+\-]\d{2}:\d{2}$|Z$/.test(s.fecha) ? s.fecha : s.fecha + 'Z'
@@ -78,7 +60,7 @@ function SelectorAreas({ areas, selected, onChange, darkMode }) {
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const card   = darkMode ? '#111827' : '#FFFFFF'
   useEffect(() => {
     const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
@@ -142,7 +124,7 @@ function ModalCerrarSesion({ darkMode, sesion, onClose, onConfirmar, loading }) 
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
@@ -182,28 +164,57 @@ function ModalCerrarSesion({ darkMode, sesion, onClose, onConfirmar, loading }) 
    PANEL DE ASISTENCIA (sin cambios)
 ══════════════════════════════════════════ */
 function PanelAsistencia({ sesion, capacitacion, theme }) {
+  const { darkMode } = useTheme()
   const { text, sub, input, border } = theme
   const areaIds = capacitacion.areas?.map(a => a.id) ?? []
   const { empleados, loading: loadingEmp } = useEmpleadosPorAreas(areaIds)
   const [asistencia, setAsistencia]   = useState({})
   const [guardando, setGuardando]     = useState({})
   const [loadingAsis, setLoadingAsis] = useState(true)
+  const [errorMsg, setErrorMsg]       = useState('')
+  const [okMsg, setOkMsg]             = useState('')
+  const [marcandoTodos, setMarcandoTodos] = useState(false)
 
   useEffect(() => {
     setLoadingAsis(true)
     capacitacionesAPI.getAsistencia(sesion.id)
-      .then(r => { const map = {}; r.data.forEach(a => { map[a.empleado_id] = a.estado }); setAsistencia(map) })
+      .then(r => {
+        const map = {}
+        const VALID = ['presente', 'ausente', 'justificado']
+        r.data.forEach(a => { if (VALID.includes(a.estado)) map[a.empleado_id] = a.estado })
+        setAsistencia(map)
+      })
       .catch(() => {})
       .finally(() => setLoadingAsis(false))
   }, [sesion.id])
 
-  const marcar = async (empleadoId, estado) => {
+  const showOk = (msg) => {
+    setErrorMsg('')
+    setOkMsg(msg)
+    setTimeout(() => setOkMsg(''), 2500)
+  }
+
+  const marcar = async (empleadoId, estado, nombre) => {
     setGuardando(g => ({ ...g, [empleadoId]: true }))
     try {
       await capacitacionesAPI.registrarAsistencia({ sesion_id: sesion.id, empleado_id: empleadoId, estado })
       setAsistencia(a => ({ ...a, [empleadoId]: estado }))
-    } catch (e) { console.error(e) }
+      showOk(`Asistencia de ${nombre} guardada.`)
+    } catch (e) {
+      setErrorMsg(`No se pudo guardar la asistencia de ${nombre}. Intenta de nuevo.`)
+    }
     finally { setGuardando(g => ({ ...g, [empleadoId]: false })) }
+  }
+
+  const marcarTodosPresentes = async () => {
+    setMarcandoTodos(true)
+    setErrorMsg('')
+    const pendientes = empleados.filter(emp => asistencia[emp.id] !== 'presente')
+    for (const emp of pendientes) {
+      await marcar(emp.id, 'presente', emp.nombre)
+    }
+    setMarcandoTodos(false)
+    showOk('Asistencia guardada para todos los empleados presentes.')
   }
 
   const ESTADOS = [
@@ -227,8 +238,22 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
   const ausentes  = Object.values(asistencia).filter(e => e === 'ausente').length
   const justif    = Object.values(asistencia).filter(e => e === 'justificado').length
 
+  const hayPendientes = empleados.some(emp => asistencia[emp.id] !== 'presente')
+
   return (
     <div className="space-y-4">
+      {errorMsg && (
+        <div className="text-sm rounded-lg px-4 py-3"
+             style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#FEF2F2', border: `1px solid ${darkMode ? 'rgba(239,68,68,0.3)' : '#FECACA'}`, color: darkMode ? '#FCA5A5' : '#B91C1C' }}>
+          {errorMsg}
+        </div>
+      )}
+      {okMsg && (
+        <div className="text-sm rounded-lg px-4 py-3"
+             style={{ backgroundColor: darkMode ? 'rgba(34,197,94,0.1)' : '#F0FDF4', border: `1px solid ${darkMode ? 'rgba(34,197,94,0.3)' : '#BBF7D0'}`, color: darkMode ? '#86EFAC' : '#15803D' }}>
+          {okMsg}
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-2">
         {[
           { label: 'Presentes',    value: presentes, color: '#22C55E', bg: 'rgba(34,197,94,0.1)'  },
@@ -241,7 +266,14 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
           </div>
         ))}
       </div>
-      <p className="text-xs" style={{ color: sub }}>{total} empleados en esta capacitación</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs" style={{ color: sub }}>{total} empleados en esta capacitación</p>
+        <button onClick={marcarTodosPresentes} disabled={marcandoTodos || !hayPendientes}
+          className="text-xs font-semibold px-3 py-1.5 rounded-lg transition disabled:opacity-50 flex items-center gap-1"
+          style={{ color: '#22C55E', backgroundColor: 'rgba(34,197,94,0.1)' }}>
+          <CheckCircle size={12} /> {marcandoTodos ? 'Marcando...' : 'Marcar todos como presentes'}
+        </button>
+      </div>
       <div className="space-y-2">
         {empleados.map(emp => {
           const estadoActual = asistencia[emp.id]
@@ -257,7 +289,7 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
                   const activo = estadoActual === e.value
                   const Icon   = e.icon
                   return (
-                    <button key={e.value} onClick={() => !cargando && marcar(emp.id, e.value)}
+                    <button key={e.value} onClick={() => !cargando && marcar(emp.id, e.value, emp.nombre)}
                       disabled={cargando} title={e.label}
                       className="w-8 h-8 rounded-lg flex items-center justify-center transition disabled:opacity-40"
                       style={{ backgroundColor: activo ? e.color + '22' : 'transparent', border: `1px solid ${activo ? e.color : border}`, color: activo ? e.color : sub }}>
@@ -557,7 +589,7 @@ function ModalNuevaCapacitacion({ darkMode, onClose, onCreada }) {
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
   const { areas, loading: loadingAreas } = useAreas()
   const [form, setForm]       = useState({ titulo: '', objetivos: '', duracion_horas: 1 })
@@ -640,7 +672,7 @@ function ModalReprogramar({ darkMode, sesion, onClose, onReprogramada }) {
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
   const [form, setForm]       = useState({ fecha: backendToInputLocal(sesion.fecha), lugar: sesion.lugar ?? '' })
   const [banner, setBanner]   = useState('')
@@ -677,6 +709,7 @@ function ModalReprogramar({ darkMode, sesion, onClose, onReprogramada }) {
               onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
               className="w-full rounded-lg px-3 py-2 text-sm outline-none"
               style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }} />
+            <p className="text-xs mt-1" style={{ color: sub }}>Hora Colombia (UTC−5)</p>
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>
@@ -756,7 +789,7 @@ function FilaSesion({ sesion, theme, onReprogramar, onAsistencia, onCerrar, onCa
         {puedeCancelar && (
           <button onClick={() => onCambiarEstado(sesion, 'cancelada')} disabled={accionEnCurso}
             className="text-xs font-medium px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 disabled:opacity-50"
-            style={{ color: '#9CA3AF', backgroundColor: 'rgba(107,114,128,0.12)' }}>
+            style={{ color: '#CBD5E1', backgroundColor: 'rgba(107,114,128,0.12)' }}>
             <Ban size={12} /> Cancelar
           </button>
         )}
@@ -780,7 +813,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
   const theme  = { card, border, text, sub, input }
 
@@ -796,6 +829,10 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
   const [loading, setLoading]                   = useState(false)
   const [loadingToggle, setLoadingToggle]       = useState(false)
   const [accionSesion, setAccionSesion]         = useState(false)
+  const [confirmCancelar, setConfirmCancelar]   = useState(null)
+  const [confirmEliminar, setConfirmEliminar]   = useState(false)
+  const [confirmSuspender, setConfirmSuspender] = useState(false)
+  const [eliminando, setEliminando]             = useState(false)
 
   const { areas, loading: loadingAreas } = useAreas()
   const [editForm, setEditForm] = useState({
@@ -807,7 +844,8 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
   const setEdit = (k, v) => setEditForm(f => ({ ...f, [k]: v }))
 
   const cargarSesiones = () =>
-    capacitacionesAPI.getSesiones(capacitacion.id).then(r => setSesiones(r.data)).catch(console.error)
+    capacitacionesAPI.getSesiones(capacitacion.id).then(r => setSesiones(r.data))
+      .catch(() => setBanner('No se pudieron cargar las sesiones de esta capacitación. Intenta de nuevo.'))
 
   useEffect(() => { cargarSesiones() }, [capacitacion.id])
 
@@ -841,6 +879,22 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
       await cargarSesiones(); onActualizada(); setSesionCerrar(null)
     } catch (err) { setBanner(getErrorMessage(err, 'Error al cambiar el estado de la sesión.'))
     } finally { setAccionSesion(false) }
+  }
+
+  const solicitarCambioEstado = (sesion, estado) => {
+    if (estado === 'cancelada') { setConfirmCancelar(sesion); return }
+    cambiarEstadoSesion(sesion, estado)
+  }
+
+  const eliminarCapacitacion = async () => {
+    setEliminando(true)
+    try {
+      await capacitacionesAPI.eliminar(capacitacion.id)
+      onActualizada(); onClose()
+    } catch (err) {
+      setBannerEdit({ type: 'error', msg: getErrorMessage(err, 'Error al eliminar la capacitación.') })
+      setConfirmEliminar(false)
+    } finally { setEliminando(false) }
   }
 
   const guardarEdicion = async () => {
@@ -921,7 +975,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="font-bold text-lg truncate" style={{ color: text }}>{capacitacion.titulo}</h2>
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: esActiva ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)', color: esActiva ? '#22C55E' : '#9CA3AF' }}>
+                      style={{ backgroundColor: esActiva ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)', color: esActiva ? '#22C55E' : '#CBD5E1' }}>
                   {esActiva ? 'Activa' : 'Suspendida'}
                 </span>
               </div>
@@ -930,7 +984,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button onClick={toggleActivo} disabled={loadingToggle}
+              <button onClick={() => esActiva ? setConfirmSuspender(true) : toggleActivo()} disabled={loadingToggle}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-50"
                 style={{ backgroundColor: esActiva ? 'rgba(239,68,68,0.12)' : 'rgba(99,102,241,0.12)', color: esActiva ? '#EF4444' : '#6366F1' }}>
                 {loadingToggle ? '...' : esActiva ? <><PowerOff size={13} /> Suspender</> : <><Power size={13} /> Activar</>}
@@ -952,7 +1006,12 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-            {banner && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{banner}</div>}
+            {banner && (
+              <div className="text-sm rounded-lg px-4 py-3"
+                   style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#FEF2F2', border: `1px solid ${darkMode ? 'rgba(239,68,68,0.3)' : '#FECACA'}`, color: darkMode ? '#FCA5A5' : '#B91C1C' }}>
+                {banner}
+              </div>
+            )}
 
             {/* TAB SESIONES */}
             {tab === 'sesiones' && (
@@ -965,7 +1024,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
                     onReprogramar={setSesionReprogramar}
                     onAsistencia={setSesionAsistencia}
                     onCerrar={setSesionCerrar}
-                    onCambiarEstado={cambiarEstadoSesion}
+                    onCambiarEstado={solicitarCambioEstado}
                     onEvaluacion={setSesionEvaluacion}
                   />
                 ))}
@@ -980,6 +1039,12 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
                         onChange={e => setSesionForm(f => ({ ...f, fecha: e.target.value }))}
                         className="w-full rounded-lg px-3 py-2 text-sm outline-none"
                         style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
+                      <p className="text-xs mt-1" style={{ color: sub }}>Hora Colombia (UTC−5)</p>
+                      {sesionForm.fecha && new Date(sesionForm.fecha) < new Date() && (
+                        <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#F59E0B' }}>
+                          <AlertTriangle size={12} /> La fecha seleccionada es en el pasado.
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="text-xs mb-1 block" style={{ color: sub }}>Lugar</label>
@@ -1004,7 +1069,7 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
                 {[
                   { label: 'Objetivos', value: capacitacion.objetivos || 'Sin objetivos registrados.' },
                   { label: 'Duración',  value: `${capacitacion.duracion_horas} horas` },
-                  { label: 'Estado',    value: esActiva ? 'Activa' : 'Suspendida', style: { color: esActiva ? '#22C55E' : '#9CA3AF', fontWeight: 600 } },
+                  { label: 'Estado',    value: esActiva ? 'Activa' : 'Suspendida', style: { color: esActiva ? '#22C55E' : '#CBD5E1', fontWeight: 600 } },
                 ].map(({ label, value, style }) => (
                   <div key={label} className="rounded-lg p-3" style={{ backgroundColor: input }}>
                     <p className="text-xs mb-1" style={{ color: sub }}>{label}</p>
@@ -1065,6 +1130,17 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
                   style={{ backgroundColor: '#6366F1' }}>
                   {loadingEdit ? 'Guardando...' : 'Guardar cambios'}
                 </button>
+
+                <div className="pt-3 border-t" style={{ borderColor: border }}>
+                  <button onClick={() => setConfirmEliminar(true)}
+                    className="w-full py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-1.5"
+                    style={{ color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                    <Trash2 size={14} /> Eliminar capacitación
+                  </button>
+                  <p className="text-xs mt-1.5 text-center" style={{ color: sub }}>
+                    Esta acción es permanente y elimina también sus sesiones.
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -1081,6 +1157,39 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
           onClose={() => setSesionCerrar(null)}
           onConfirmar={(estado) => cambiarEstadoSesion(sesionCerrar, estado)} />
       )}
+
+      <ConfirmDialog
+        open={!!confirmCancelar}
+        title="¿Cancelar sesión?"
+        message={confirmCancelar ? `Se cancelará la sesión del ${formatColombia(confirmCancelar.fecha)}. Podrás reabrirla más adelante si es necesario.` : ''}
+        confirmLabel="Cancelar sesión"
+        danger
+        loading={accionSesion}
+        onConfirm={async () => { await cambiarEstadoSesion(confirmCancelar, 'cancelada'); setConfirmCancelar(null) }}
+        onCancel={() => setConfirmCancelar(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmSuspender}
+        title="¿Suspender capacitación?"
+        message="Los empleados asignados no podrán ver ni acceder a esta capacitación mientras esté suspendida. Podrás reactivarla en cualquier momento."
+        confirmLabel="Suspender"
+        danger
+        loading={loadingToggle}
+        onConfirm={() => { setConfirmSuspender(false); toggleActivo() }}
+        onCancel={() => setConfirmSuspender(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmEliminar}
+        title="¿Eliminar capacitación?"
+        message="Esta acción eliminará la capacitación y todas sus sesiones de forma permanente. No se puede deshacer."
+        confirmLabel="Eliminar"
+        danger
+        loading={eliminando}
+        onConfirm={eliminarCapacitacion}
+        onCancel={() => setConfirmEliminar(false)}
+      />
     </>
   )
 }
@@ -1089,16 +1198,17 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
    PÁGINA PRINCIPAL (sin cambios)
 ══════════════════════════════════════════ */
 export default function Capacitaciones() {
-  const { darkMode } = useOutletContext()
+  const { darkMode } = useTheme()
   const bg     = darkMode ? '#0B0F19' : '#F9FAFB'
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
 
   const [capacitaciones, setCapacitaciones] = useState([])
   const [cobertura, setCobertura]           = useState(null)
   const [loading, setLoading]               = useState(true)
+  const [error, setError]                   = useState(false)
   const [modalNuevo, setModalNuevo]         = useState(false)
   const [modalDetalle, setModalDetalle]     = useState(null)
   const [filtro, setFiltro]                 = useState('activas')
@@ -1110,7 +1220,9 @@ export default function Capacitaciones() {
       const { data } = await capacitacionesAPI.getAll()
       const arr = Array.isArray(data) ? data : data.items ?? data.capacitaciones ?? data.data ?? []
       setCapacitaciones(arr)
-    } catch (err) { console.error('Error cargando capacitaciones:', err)
+      setError(false)
+    } catch (err) {
+      setError(true)
     } finally { setLoading(false) }
     try {
       const { data } = await capacitacionesAPI.getCobertura()
@@ -1134,6 +1246,8 @@ export default function Capacitaciones() {
     if (filtro === 'inactivas') return capacitaciones.filter(c => !c.activo)
     return capacitaciones
   }, [capacitaciones, filtro])
+
+  const { paginaItems: listaPagina, pagina, totalPaginas, setPagina } = usePaginacion(lista)
 
   const pct = cobertura?.porcentaje ?? 0
 
@@ -1180,8 +1294,21 @@ export default function Capacitaciones() {
         </div>
       )}
 
-      {loading ? (
-        <p className="text-center py-12 text-sm" style={{ color: sub }}>Cargando capacitaciones...</p>
+      {error ? (
+        <div className="text-center py-16">
+          <BookOpen size={40} className="mx-auto mb-3" style={{ color: sub }} />
+          <p className="text-sm mb-3" style={{ color: sub }}>No se pudieron cargar las capacitaciones.</p>
+          <button onClick={cargar}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ backgroundColor: '#6366F1' }}>
+            Reintentar
+          </button>
+        </div>
+      ) : loading ? (
+        <div className="flex flex-col items-center py-12 gap-2" style={{ color: sub }}>
+          <Loader2 size={28} className="animate-spin" />
+          <p className="text-sm">Cargando capacitaciones…</p>
+        </div>
       ) : lista.length === 0 ? (
         <div className="text-center py-16">
           <BookOpen size={40} className="mx-auto mb-3" style={{ color: sub }} />
@@ -1190,14 +1317,15 @@ export default function Capacitaciones() {
           </p>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {lista.map(c => (
+          {listaPagina.map(c => (
             <div key={c.id} className="rounded-xl p-5 flex flex-col gap-3 transition"
                  style={{ backgroundColor: card, border: `1px solid ${border}`, opacity: c.activo ? 1 : 0.65 }}>
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-sm leading-snug" style={{ color: text }}>{c.titulo}</p>
                 <span className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: c.activo ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)', color: c.activo ? '#22C55E' : '#9CA3AF' }}>
+                      style={{ backgroundColor: c.activo ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)', color: c.activo ? '#22C55E' : '#CBD5E1' }}>
                   {c.activo ? 'Activa' : 'Suspendida'}
                 </span>
               </div>
@@ -1213,13 +1341,17 @@ export default function Capacitaciones() {
               )}
               <div className="flex items-center justify-between mt-auto pt-1">
                 <p className="text-xs flex items-center gap-1" style={{ color: sub }}><Clock size={11} />{c.duracion_horas}h</p>
-                <button onClick={() => setModalDetalle(c)} className="text-xs font-semibold hover:underline" style={{ color: '#6366F1' }}>
+                <button onClick={() => setModalDetalle(c)}
+                        className="text-xs font-semibold rounded-lg px-3 py-1.5 transition hover:opacity-90"
+                        style={{ backgroundColor: '#6366F1', color: '#FFFFFF' }}>
                   Ver detalle →
                 </button>
               </div>
             </div>
           ))}
         </div>
+        <Paginador pagina={pagina} totalPaginas={totalPaginas} onCambiar={setPagina} darkMode={darkMode} />
+        </>
       )}
 
       {modalNuevo && <ModalNuevaCapacitacion darkMode={darkMode} onClose={() => setModalNuevo(false)} onCreada={cargar} />}

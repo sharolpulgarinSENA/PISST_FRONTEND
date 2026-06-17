@@ -12,7 +12,8 @@ import {
 const COLORS = ['#6366F1', '#10B981', '#F97316', '#F43F5E', '#0EA5E9', '#F59E0B']
 
 export default function OverviewChart({ darkMode, data }) {
-  const muted = darkMode ? '#9CA3AF' : '#6B7280'
+  const muted = darkMode ? '#CBD5E1' : '#6B7280'
+  const isEmpty = !data || data.length === 0 || data.every(d => !d.valor)
 
   return (
     <section
@@ -34,6 +35,13 @@ export default function OverviewChart({ darkMode, data }) {
         </p>
       </div>
 
+      {isEmpty ? (
+        <div className="w-full h-64 sm:h-80 flex flex-col items-center justify-center gap-2"
+             style={{ color: muted }}>
+          <BarChart className="w-10 h-10 opacity-30" />
+          <p className="text-sm">No hay datos para mostrar en este periodo.</p>
+        </div>
+      ) : (
       <div className="w-full h-64 sm:h-80">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
@@ -75,6 +83,7 @@ export default function OverviewChart({ darkMode, data }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
+      )}
     </section>
   )
 }

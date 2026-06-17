@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import {
-  X, Send, Paperclip, Loader2, AlertTriangle, ClipboardList, ChevronUp,
+  X, Send, Paperclip, Loader2, AlertTriangle, ClipboardList, ChevronUp, RefreshCw,
 } from 'lucide-react'
 import casco from '../../assets/imagenes/concasco-removebg-preview.png'
-import { chatAPI } from '../../services/api'
+import { chatAPI, getErrorMessage } from '../../services/api'
+import { normFecha } from '../../utils/dates'
 
 const HISTORIAL_LIMITE = 20
 const ARCHIVO_MAX_BYTES = 10 * 1024 * 1024
@@ -14,24 +15,11 @@ const TIPOS_REPORTE = [
   { value: 'cuasi_accidente',    label: 'Cuasi accidente' },
 ]
 
-function normFecha(f) {
-  if (!f) return ''
-  return f.endsWith('Z') || f.includes('+') || /[+-]\d{2}:\d{2}$/.test(f) ? f : f + 'Z'
-}
-
 function fmtHora(f) {
   if (!f) return ''
   return new Intl.DateTimeFormat('es-CO', {
     timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit',
   }).format(new Date(normFecha(f)))
-}
-
-function extraerDetalle(err) {
-  const detail = err.response?.data?.detail
-  if (!detail) return null
-  if (typeof detail === 'string') return detail
-  if (Array.isArray(detail)) return detail.map((d) => d.msg).filter(Boolean).join(' · ')
-  return null
 }
 
 function MensajeBurbuja({ rol, texto, hora, emergencia, error, cargando, theme }) {
@@ -55,7 +43,7 @@ function MensajeBurbuja({ rol, texto, hora, emergencia, error, cargando, theme }
         }}
       >
         {cargando
-          ? <Loader2 size={14} className="animate-spin" style={{ color: darkMode ? '#9CA3AF' : '#6B7280' }} />
+          ? <Loader2 size={14} className="animate-spin" style={{ color: darkMode ? '#CBD5E1' : '#6B7280' }} />
           : texto}
         {hora && !cargando && (
           <p className="text-[10px] mt-1 opacity-60">{fmtHora(hora)}</p>
@@ -123,7 +111,7 @@ export default function SasbotWidget({ darkMode }) {
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
   const theme  = { darkMode, card, border, text, sub, input }
 
@@ -142,23 +130,28 @@ export default function SasbotWidget({ darkMode }) {
   const [enviandoReporte, setEnviandoReporte] = useState(false)
   const [reporteForm, setReporteForm] = useState({ tipo: 'accidente', descripcion: '', lugar: '' })
   const [archivoError, setArchivoError] = useState(null)
+  const [vpState, setVpState] = useState({ kbH: 0, vvH: typeof window !== 'undefined' ? window.innerHeight : 800 })
 
   const widgetRef = useRef(null)
   const scrollRef = useRef(null)
   const fileInputRef = useRef(null)
   const cargandoMasRef = useRef(false)
+  const prevScrollHeightRef = useRef(0)
 
   useEffect(() => {
     if (open && !cargado) {
       cargarHistorial(1)
       setCargado(true)
     }
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: load history only once per session (cargado flag); cargarHistorial reference changes on each render
+  }, [open])
 
   useEffect(() => {
     if (!open) return
     if (cargandoMasRef.current) {
       cargandoMasRef.current = false
+      const diff = (scrollRef.current?.scrollHeight ?? 0) - prevScrollHeightRef.current
+      if (diff > 0) scrollRef.current?.scrollTo({ top: diff })
       return
     }
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
@@ -174,9 +167,22 @@ export default function SasbotWidget({ darkMode }) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Adapta posición y altura cuando el teclado virtual abre/cierra (iOS Safari + Android)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      const kbH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      setVpState({ kbH: kbH > 50 ? kbH : 0, vvH: vv.height })
+    }
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update) }
+  }, [])
+
   async function cargarHistorial(pag) {
     if (pag === 1) setCargandoHistorial(true)
-    else { setCargandoMas(true); cargandoMasRef.current = true }
+    else { setCargandoMas(true); cargandoMasRef.current = true; prevScrollHeightRef.current = scrollRef.current?.scrollHeight ?? 0 }
 
     try {
       const { data } = await chatAPI.getHistorial(pag, HISTORIAL_LIMITE)
@@ -240,7 +246,7 @@ export default function SasbotWidget({ darkMode }) {
     } catch (err) {
       setMensajes((prev) => [...prev, {
         rol: 'bot',
-        texto: extraerDetalle(err) || 'No se pudo escalar la conversación. Intenta más tarde.',
+        texto: getErrorMessage(err, null) || 'No se pudo escalar la conversación. Intenta más tarde.',
         hora: new Date().toISOString(), error: true,
       }])
     } finally {
@@ -291,7 +297,7 @@ export default function SasbotWidget({ darkMode }) {
       setModoEmergencia(!!data?.modo_emergencia)
     } catch (err) {
       setMensajes((prev) => [...prev, {
-        rol: 'bot', texto: extraerDetalle(err) || 'No se pudo analizar el archivo.',
+        rol: 'bot', texto: getErrorMessage(err, null) || 'No se pudo analizar el archivo.',
         hora: new Date().toISOString(), error: true,
       }])
     } finally {
@@ -321,7 +327,7 @@ export default function SasbotWidget({ darkMode }) {
       setMostrarReporte(false)
     } catch (err) {
       setMensajes((prev) => [...prev, {
-        rol: 'bot', texto: extraerDetalle(err) || 'No se pudo registrar el reporte.',
+        rol: 'bot', texto: getErrorMessage(err, null) || 'No se pudo registrar el reporte.',
         hora: new Date().toISOString(), error: true,
       }])
     } finally {
@@ -330,11 +336,23 @@ export default function SasbotWidget({ darkMode }) {
   }
 
   return (
-    <div ref={widgetRef} className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-50 flex flex-col items-end gap-3">
+    <div
+      ref={widgetRef}
+      className={`fixed right-4 lg:right-6 z-50 flex flex-col items-end gap-3${vpState.kbH === 0 ? ' bottom-20 lg:bottom-6' : ''}`}
+      style={vpState.kbH > 0 ? { bottom: vpState.kbH + 8 } : undefined}
+    >
       {open && (
         <div
-          className="w-[92vw] max-w-sm h-[32rem] max-h-[75vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden"
-          style={{ backgroundColor: card, border: `1px solid ${border}` }}
+          className="w-[92vw] max-w-sm flex flex-col rounded-2xl shadow-2xl overflow-hidden"
+          style={{
+            backgroundColor: card,
+            border: `1px solid ${border}`,
+            height: '32rem',
+            maxHeight: vpState.kbH > 0
+              ? `${Math.max(220, vpState.vvH - 76)}px`
+              : 'min(32rem, 75dvh)',
+          }}
+          role="dialog" aria-modal="true" aria-label="Asistente SASBOT"
         >
           {/* Cabecera */}
           <div className="flex items-center gap-3 px-4 py-3 shrink-0" style={{ backgroundColor: '#6366F1' }}>
@@ -343,6 +361,14 @@ export default function SasbotWidget({ darkMode }) {
               <p className="text-sm font-semibold text-white">SASBOT</p>
               <p className="text-[11px] text-white/80">Asistente virtual SST</p>
             </div>
+            <button
+              onClick={() => cargarHistorial(1)}
+              disabled={cargandoHistorial}
+              aria-label="Actualizar historial"
+              className="disabled:opacity-50"
+            >
+              <RefreshCw size={15} className="text-white" />
+            </button>
             <button onClick={() => setOpen(false)} aria-label="Cerrar chat">
               <X size={18} className="text-white" />
             </button>

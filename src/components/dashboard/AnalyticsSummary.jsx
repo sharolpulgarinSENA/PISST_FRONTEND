@@ -1,7 +1,7 @@
 import { AlertTriangle, ShieldAlert, GraduationCap, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 
 function muted(darkMode) {
-  return darkMode ? '#9CA3AF' : '#6B7280'
+  return darkMode ? '#CBD5E1' : '#6B7280'
 }
 
 function Panel({ darkMode, title, Icon, iconBg, iconColor, children }) {
@@ -154,8 +154,9 @@ export default function AnalyticsSummary({ darkMode, incidentes, riesgos, capaci
             <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
               {capacitaciones.alertas_asistencia.map((a) => (
                 <div key={a.empleado_id} className="flex items-center justify-between text-xs">
-                  <span className="truncate font-mono" style={{ color: darkMode ? '#D1D5DB' : '#374151' }}>
-                    {a.empleado_id.slice(0, 8)}…
+                  <span className="truncate" style={{ color: darkMode ? '#D1D5DB' : '#374151' }}
+                        title={a.nombre || a.empleado_nombre || a.empleado_id}>
+                    {a.nombre || a.empleado_nombre || `${a.empleado_id.slice(0, 8)}…`}
                   </span>
                   <span className="text-rose-500 dark:text-rose-400 font-medium">{a.asistencia_pct}%</span>
                 </div>

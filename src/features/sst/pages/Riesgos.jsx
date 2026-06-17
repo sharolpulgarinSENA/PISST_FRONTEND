@@ -1,13 +1,45 @@
-import { useState, useEffect } from 'react'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { Plus, X, ShieldAlert, ChevronDown, ChevronUp, BarChart2, Shield, Users } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useTheme } from '../../../context/ThemeContext'
+import { Plus, X, ShieldAlert, ChevronDown, ChevronUp, BarChart2, Shield, Users, Info } from 'lucide-react'
 import { riesgosAPI, getErrorMessage } from '../../../services/api'
+import { useModal } from '../../../hooks/useModal'
+import { usePaginacion } from '../../../hooks/usePaginacion'
+import Paginador from '../../../components/Paginador'
+import ConfirmDialog from '../../../components/ConfirmDialog'
+
+const MAX_TRABAJADORES_EXPUESTOS = 10000
 
 const TIPOS_PELIGRO = [
   'fisico', 'quimico', 'biologico', 'ergonomico',
   'psicosocial', 'mecanico', 'electrico', 'locativo', 'fenomeno_natural'
 ]
+const TIPO_LABEL = {
+  fisico:          'Físico',
+  quimico:         'Químico',
+  biologico:       'Biológico',
+  ergonomico:      'Ergonómico',
+  psicosocial:     'Psicosocial',
+  mecanico:        'Mecánico',
+  electrico:       'Eléctrico',
+  locativo:        'Locativo',
+  fenomeno_natural: 'Fenómeno natural',
+}
+const TIPO_CONTROL_LABEL = {
+  eliminacion:    'Eliminación',
+  sustitucion:    'Sustitución',
+  ingenieria:     'Ingeniería',
+  administrativo: 'Administrativo',
+  epp:            'EPP',
+}
+function normalizarTipo(tipo) {
+  return TIPO_LABEL[tipo] || TIPO_CONTROL_LABEL[tipo] || (tipo ? tipo.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—')
+}
+
 const TIPOS_CONTROL = ['eliminacion', 'sustitucion', 'ingenieria', 'administrativo', 'epp']
+
+const PROB_LABELS = ['', 'Rara', 'Poco probable', 'Posible', 'Probable', 'Casi segura']
+const SEV_LABELS  = ['', 'Insignificante', 'Leve', 'Moderada', 'Grave', 'Catastrófico']
 
 const ESTADOS_CONTROL = {
   planificada:  'Planificada',
@@ -30,10 +62,11 @@ function Badge({ text, colorClass }) {
    MODAL: NUEVO PELIGRO
 ══════════════════════════════════════════ */
 function ModalNuevoPeligro({ darkMode, onClose, onCreado }) {
+  const dialogRef = useModal(onClose)
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
   const [form, setForm]       = useState({ descripcion: '', tipo: '', actividad: '', trabajadores_expuestos: 0 })
@@ -47,12 +80,24 @@ function ModalNuevoPeligro({ darkMode, onClose, onCreado }) {
     const e = {}
     if (!form.descripcion) e.descripcion = true
     if (!form.tipo)        e.tipo        = true
+    const expuestos = Number(form.trabajadores_expuestos)
+    if (form.trabajadores_expuestos === '' || expuestos < 0 || expuestos > MAX_TRABAJADORES_EXPUESTOS) {
+      e.trabajadores_expuestos = true
+    }
     setErrores(e)
-    return Object.keys(e).length === 0
+    return e
   }
 
   const guardar = async () => {
-    if (!validar()) { setBanner('Por favor, diligencia todos los campos obligatorios para continuar.'); return }
+    const e = validar()
+    if (Object.keys(e).length > 0) {
+      if (e.trabajadores_expuestos) {
+        setBanner(`Trabajadores expuestos debe ser un número entre 0 y ${MAX_TRABAJADORES_EXPUESTOS}.`)
+      } else {
+        setBanner('Por favor, diligencia todos los campos obligatorios para continuar.')
+      }
+      return
+    }
     setBanner('')
     setLoading(true)
     try {
@@ -75,14 +120,21 @@ function ModalNuevoPeligro({ darkMode, onClose, onCreado }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
-      <div className="w-full max-w-md rounded-2xl shadow-2xl"
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="modal-nuevo-peligro-title"
+           className="w-full max-w-md rounded-2xl shadow-2xl"
            style={{ backgroundColor: card, border: `1px solid ${border}` }}>
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
-          <h2 className="font-bold text-lg" style={{ color: text }}>Nuevo Peligro</h2>
-          <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+          <h2 id="modal-nuevo-peligro-title" className="font-bold text-lg" style={{ color: text }}>Nuevo Peligro</h2>
+          <button onClick={onClose} aria-label="Cerrar"><X size={18} style={{ color: sub }} /></button>
         </div>
         <div className="px-6 py-5 space-y-4">
-          {banner && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{banner}</div>}
+          {banner && (
+            <div className="text-sm rounded-lg px-4 py-3" style={{
+              backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#FEF2F2',
+              border: `1px solid ${darkMode ? 'rgba(239,68,68,0.3)' : '#FECACA'}`,
+              color: darkMode ? '#FCA5A5' : '#B91C1C'
+            }}>{banner}</div>
+          )}
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Descripción del peligro *</label>
             <textarea rows={2} placeholder="Describe el peligro identificado..." value={form.descripcion}
@@ -95,12 +147,12 @@ function ModalNuevoPeligro({ darkMode, onClose, onCreado }) {
               <select value={form.tipo} onChange={e => set('tipo', e.target.value)}
                       className={inputClass('tipo')} style={{ backgroundColor: input, color: text }}>
                 <option value="">Seleccionar...</option>
-                {TIPOS_PELIGRO.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+                {TIPOS_PELIGRO.map(t => <option key={t} value={t}>{normalizarTipo(t)}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Trabajadores expuestos</label>
-              <input type="number" min={0} value={form.trabajadores_expuestos}
+              <input type="number" min={0} max={MAX_TRABAJADORES_EXPUESTOS} value={form.trabajadores_expuestos}
                      onChange={e => set('trabajadores_expuestos', e.target.value)}
                      className={inputClass('trabajadores_expuestos')} style={{ backgroundColor: input, color: text }} />
             </div>
@@ -128,27 +180,68 @@ function ModalNuevoPeligro({ darkMode, onClose, onCreado }) {
 /* ══════════════════════════════════════════
    MODAL: DETALLE PELIGRO
 ══════════════════════════════════════════ */
-function ModalDetalle({ darkMode, peligro, initialTab = 'evaluacion', onClose, onRefresh }) {
+const FOCUSABLE_SEL_RD = 'button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+
+function ModalDetalle({ darkMode, peligro, initialTab = 'info', onClose, onRefresh }) {
+  const dialogRef = useRef(null)
+  const closeRef  = useRef(null)
+  useEffect(() => {
+    const prev = document.activeElement
+    const el = dialogRef.current
+    el?.querySelectorAll(FOCUSABLE_SEL_RD)?.[0]?.focus()
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); closeRef.current?.(); return }
+      if (e.key !== 'Tab') return
+      const els = [...(el?.querySelectorAll(FOCUSABLE_SEL_RD) ?? [])]
+      if (!els.length) return
+      if (e.shiftKey && document.activeElement === els[0]) { e.preventDefault(); els.at(-1).focus() }
+      else if (!e.shiftKey && document.activeElement === els.at(-1)) { e.preventDefault(); els[0].focus() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('keydown', onKey); prev?.focus?.() }
+  }, [])
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
   const [tab, setTab]       = useState(initialTab)
   const [detalle, setDetalle] = useState(null)
+  const [detalleError, setDetalleError] = useState(false)
   const [banner, setBanner]   = useState('')
+  const [bannerOk, setBannerOk] = useState('')
   const [evalForm, setEvalForm] = useState({ probabilidad: 1, severidad: 1, es_residual: false })
   const [controlForm, setControlForm] = useState({ descripcion: '', tipo: '', fecha_limite: '' })
+  const [showNuevaControl, setShowNuevaControl] = useState(false)
   const [loading, setLoading] = useState(false)
   const [editingControlId, setEditingControlId] = useState(null)
   const [editControlForm, setEditControlForm] = useState({ descripcion: '', estado: '', evidencia: '' })
+  const [confirmCerrar, setConfirmCerrar] = useState(false)
 
-  useEffect(() => {
+  const showOk = (msg) => { setBanner(''); setBannerOk(msg); setTimeout(() => setBannerOk(''), 3000) }
+  const errBannerStyle = { backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#FEF2F2', border: `1px solid ${darkMode ? 'rgba(239,68,68,0.3)' : '#FECACA'}`, color: darkMode ? '#FCA5A5' : '#B91C1C' }
+  const okBannerStyle  = { backgroundColor: darkMode ? 'rgba(34,197,94,0.1)'  : '#F0FDF4', border: `1px solid ${darkMode ? 'rgba(34,197,94,0.3)'  : '#BBF7D0'}`, color: darkMode ? '#86EFAC'  : '#15803D'  }
+
+  const cargarDetalle = () => {
+    setDetalleError(false)
     riesgosAPI.getPeligro(peligro.id)
       .then(r => setDetalle(r.data))
-      .catch(console.error)
-  }, [peligro.id])
+      .catch(() => { setDetalleError(true) })
+  }
+
+  useEffect(() => { cargarDetalle() }, [peligro.id])
+
+  const hayCambiosSinGuardar =
+    evalForm.probabilidad !== 1 || evalForm.severidad !== 1 || evalForm.es_residual !== false ||
+    controlForm.descripcion !== '' || controlForm.tipo !== '' || controlForm.fecha_limite !== '' ||
+    editingControlId !== null
+
+  const intentarCerrar = () => {
+    if (hayCambiosSinGuardar) setConfirmCerrar(true)
+    else onClose()
+  }
+  closeRef.current = intentarCerrar
 
   const nivelRiesgo = evalForm.probabilidad * evalForm.severidad
   const nivelLabel = nivelRiesgo <= 4 ? 'bajo' : nivelRiesgo <= 9 ? 'medio' : nivelRiesgo <= 16 ? 'alto' : 'critico'
@@ -163,7 +256,7 @@ function ModalDetalle({ darkMode, peligro, initialTab = 'evaluacion', onClose, o
       })
       const r = await riesgosAPI.getPeligro(peligro.id)
       setDetalle(r.data)
-      setBanner('')
+      showOk('Evaluación guardada correctamente.')
       onRefresh()
     } catch (err) {
       setBanner(getErrorMessage(err, 'Error al guardar evaluación.'))
@@ -187,7 +280,7 @@ function ModalDetalle({ darkMode, peligro, initialTab = 'evaluacion', onClose, o
       const r = await riesgosAPI.getPeligro(peligro.id)
       setDetalle(r.data)
       setEditingControlId(null)
-      setBanner('')
+      showOk('Control actualizado correctamente.')
     } catch (err) {
       setBanner(getErrorMessage(err, 'Error al actualizar el control.'))
     } finally { setLoading(false) }
@@ -208,30 +301,33 @@ function ModalDetalle({ darkMode, peligro, initialTab = 'evaluacion', onClose, o
       const r = await riesgosAPI.getPeligro(peligro.id)
       setDetalle(r.data)
       setControlForm({ descripcion: '', tipo: '', fecha_limite: '' })
-      setBanner('')
+      setShowNuevaControl(false)
+      showOk('Medida de control guardada correctamente.')
     } catch (err) {
       setBanner(getErrorMessage(err, 'Error al guardar control.'))
     } finally { setLoading(false) }
   }
 
   const tabs = [
-    { id: 'evaluacion', label: 'Evaluación', Icon: BarChart2 },
-    { id: 'controles',  label: 'Controles',  Icon: Shield    },
+    { id: 'info',       label: 'Información', Icon: Info     },
+    { id: 'evaluacion', label: 'Evaluación',  Icon: BarChart2 },
+    { id: 'controles',  label: 'Controles',   Icon: Shield    },
   ]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
-      <div className="w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col"
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="modal-detalle-peligro-title"
+           className="w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col"
            style={{ backgroundColor: card, border: `1px solid ${border}` }}>
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
           <div>
-            <h2 className="font-bold text-lg" style={{ color: text }}>{peligro.descripcion}</h2>
-            <p className="text-xs mt-0.5 capitalize" style={{ color: sub }}>
-              Tipo: {peligro.tipo} · {peligro.trabajadores_expuestos} trabajadores expuestos
+            <h2 id="modal-detalle-peligro-title" className="font-bold text-lg" style={{ color: text }}>{peligro.descripcion}</h2>
+            <p className="text-xs mt-0.5" style={{ color: sub }}>
+              Tipo: {normalizarTipo(peligro.tipo)} · {peligro.trabajadores_expuestos} trabajadores expuestos
             </p>
           </div>
-          <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+          <button onClick={intentarCerrar} aria-label="Cerrar"><X size={18} style={{ color: sub }} /></button>
         </div>
 
         <div className="flex border-b px-6" style={{ borderColor: border }}>
@@ -245,7 +341,62 @@ function ModalDetalle({ darkMode, peligro, initialTab = 'evaluacion', onClose, o
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          {banner && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{banner}</div>}
+          {bannerOk && <div className="text-sm rounded-lg px-4 py-3" style={okBannerStyle}>{bannerOk}</div>}
+          {banner && <div className="text-sm rounded-lg px-4 py-3" style={errBannerStyle}>{banner}</div>}
+
+          {detalleError && (
+            <div className="text-sm rounded-lg px-4 py-3 flex items-center justify-between gap-3" style={errBannerStyle}>
+              <span>No se pudo cargar el detalle del peligro.</span>
+              <button onClick={cargarDetalle} className="font-semibold underline shrink-0">Reintentar</button>
+            </div>
+          )}
+
+          {/* ── TAB INFORMACIÓN ── */}
+          {tab === 'info' && (
+            <div className="space-y-3">
+              {[
+                { label: 'Descripción',           value: peligro.descripcion },
+                { label: 'Tipo de peligro',       value: normalizarTipo(peligro.tipo) },
+                { label: 'Actividad relacionada', value: peligro.actividad || '—' },
+                { label: 'Trabajadores expuestos',value: `${peligro.trabajadores_expuestos} personas` },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-lg p-3" style={{ backgroundColor: input }}>
+                  <p className="text-xs mb-1" style={{ color: sub }}>{label}</p>
+                  <p className="text-sm font-medium" style={{ color: text }}>{value}</p>
+                </div>
+              ))}
+              {detalle?.evaluaciones?.length > 0 && (
+                <div className="rounded-lg p-3" style={{ backgroundColor: input }}>
+                  <p className="text-xs mb-2" style={{ color: sub }}>Última evaluación</p>
+                  {(() => {
+                    const ev = detalle.evaluaciones[0]
+                    return (
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm" style={{ color: text }}>
+                          P:{ev.probabilidad} × S:{ev.severidad} = <strong>{ev.probabilidad * ev.severidad}</strong>
+                          {ev.es_residual && <span className="ml-2 text-xs" style={{ color: sub }}>· Residual</span>}
+                        </p>
+                        <Badge text={ev.nivel_riesgo} colorClass={NIVEL_COLOR[ev.nivel_riesgo] || 'bg-gray-500/20 text-gray-300'} />
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
+              {detalle && (
+                <div className="rounded-lg p-3" style={{ backgroundColor: input }}>
+                  <p className="text-xs mb-1" style={{ color: sub }}>Medidas de control</p>
+                  <p className="text-sm font-medium" style={{ color: text }}>
+                    {detalle.medidas_control?.length ?? 0} registradas
+                  </p>
+                </div>
+              )}
+              <button onClick={() => setTab('evaluacion')}
+                      className="w-full py-2.5 rounded-lg text-sm font-semibold transition"
+                      style={{ color: '#6366F1', backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                Nueva evaluación →
+              </button>
+            </div>
+          )}
 
           {/* ── TAB EVALUACIÓN ── */}
           {tab === 'evaluacion' && (
@@ -253,24 +404,24 @@ function ModalDetalle({ darkMode, peligro, initialTab = 'evaluacion', onClose, o
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium mb-2 block" style={{ color: sub }}>
-                    Probabilidad: {evalForm.probabilidad}
+                    Probabilidad: <span style={{ color: '#6366F1', fontWeight: 600 }}>{PROB_LABELS[evalForm.probabilidad]}</span>
                   </label>
                   <input type="range" min={1} max={5} value={evalForm.probabilidad}
                          onChange={e => setEvalForm(f => ({ ...f, probabilidad: Number(e.target.value) }))}
                          className="w-full accent-indigo-500" />
                   <div className="flex justify-between text-xs mt-1" style={{ color: sub }}>
-                    <span>Rara</span><span>Casi segura</span>
+                    {PROB_LABELS.slice(1).map(l => <span key={l} className="text-center" style={{ width: '20%', fontSize: 9 }}>{l}</span>)}
                   </div>
                 </div>
                 <div>
                   <label className="text-xs font-medium mb-2 block" style={{ color: sub }}>
-                    Severidad: {evalForm.severidad}
+                    Severidad: <span style={{ color: '#6366F1', fontWeight: 600 }}>{SEV_LABELS[evalForm.severidad]}</span>
                   </label>
                   <input type="range" min={1} max={5} value={evalForm.severidad}
                          onChange={e => setEvalForm(f => ({ ...f, severidad: Number(e.target.value) }))}
                          className="w-full accent-indigo-500" />
                   <div className="flex justify-between text-xs mt-1" style={{ color: sub }}>
-                    <span>Insignificante</span><span>Catastrófico</span>
+                    {SEV_LABELS.slice(1).map(l => <span key={l} className="text-center" style={{ width: '20%', fontSize: 9 }}>{l}</span>)}
                   </div>
                 </div>
               </div>
@@ -367,7 +518,7 @@ function ModalDetalle({ darkMode, peligro, initialTab = 'evaluacion', onClose, o
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium" style={{ color: text }}>{m.descripcion}</p>
                         <p className="text-xs mt-1" style={{ color: sub }}>
-                          Tipo: {m.tipo} · Estado: {ESTADOS_CONTROL[m.estado] || m.estado || ESTADOS_CONTROL.planificada}
+                          Tipo: {normalizarTipo(m.tipo)} · Estado: {ESTADOS_CONTROL[m.estado] || m.estado || ESTADOS_CONTROL.planificada}
                         </p>
                         {m.evidencia && (
                           <p className="text-xs mt-0.5 truncate" style={{ color: sub }}>
@@ -385,34 +536,57 @@ function ModalDetalle({ darkMode, peligro, initialTab = 'evaluacion', onClose, o
                 </div>
               ))}
 
-              <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: input, border: `1px solid ${border}` }}>
-                <p className="text-sm font-semibold" style={{ color: text }}>Nueva medida de control</p>
-                <textarea rows={2} placeholder="Descripción de la medida..." value={controlForm.descripcion}
-                          onChange={e => setControlForm(f => ({ ...f, descripcion: e.target.value }))}
-                          className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none"
-                          style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
-                <div className="grid grid-cols-2 gap-3">
-                  <select value={controlForm.tipo} onChange={e => setControlForm(f => ({ ...f, tipo: e.target.value }))}
-                          className="rounded-lg px-3 py-2 text-sm outline-none"
-                          style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }}>
-                    <option value="">Tipo de control...</option>
-                    {TIPOS_CONTROL.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-                  </select>
-                  <input type="date" value={controlForm.fecha_limite}
-                         onChange={e => setControlForm(f => ({ ...f, fecha_limite: e.target.value }))}
-                         className="rounded-lg px-3 py-2 text-sm outline-none"
-                         style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
-                </div>
-                <button onClick={guardarControl} disabled={loading}
-                        className="w-full py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
-                        style={{ backgroundColor: '#6366F1' }}>
-                  {loading ? 'Guardando...' : 'Guardar control'}
+              {!showNuevaControl ? (
+                <button onClick={() => setShowNuevaControl(true)}
+                        className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition"
+                        style={{ color: '#6366F1', backgroundColor: 'rgba(99,102,241,0.1)', border: '1px dashed rgba(99,102,241,0.4)' }}>
+                  <Plus size={15} /> Agregar medida de control
                 </button>
-              </div>
+              ) : (
+                <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: input, border: `1px solid ${border}` }}>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold" style={{ color: text }}>Nueva medida de control</p>
+                    <button onClick={() => { setShowNuevaControl(false); setControlForm({ descripcion: '', tipo: '', fecha_limite: '' }) }}
+                            className="text-xs" style={{ color: sub }}>Cancelar</button>
+                  </div>
+                  <textarea rows={2} placeholder="Descripción de la medida..." value={controlForm.descripcion}
+                            onChange={e => setControlForm(f => ({ ...f, descripcion: e.target.value }))}
+                            className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none"
+                            style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <select value={controlForm.tipo} onChange={e => setControlForm(f => ({ ...f, tipo: e.target.value }))}
+                            className="rounded-lg px-3 py-2 text-sm outline-none"
+                            style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }}>
+                      <option value="">Tipo de control...</option>
+                      {TIPOS_CONTROL.map(t => <option key={t} value={t}>{normalizarTipo(t)}</option>)}
+                    </select>
+                    <input type="date" value={controlForm.fecha_limite}
+                           onChange={e => setControlForm(f => ({ ...f, fecha_limite: e.target.value }))}
+                           className="rounded-lg px-3 py-2 text-sm outline-none"
+                           style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
+                  </div>
+                  <button onClick={guardarControl} disabled={loading}
+                          className="w-full py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+                          style={{ backgroundColor: '#6366F1' }}>
+                    {loading ? 'Guardando...' : 'Guardar control'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmCerrar}
+        title="¿Descartar cambios?"
+        message="Tienes cambios sin guardar en este formulario. Si cierras ahora, se perderán."
+        confirmLabel="Descartar y cerrar"
+        cancelLabel="Seguir editando"
+        danger
+        onConfirm={onClose}
+        onCancel={() => setConfirmCerrar(false)}
+      />
     </div>
   )
 }
@@ -421,26 +595,26 @@ function ModalDetalle({ darkMode, peligro, initialTab = 'evaluacion', onClose, o
    PÁGINA PRINCIPAL
 ══════════════════════════════════════════ */
 export default function Riesgos() {
-  const { darkMode } = useOutletContext()
+  const { darkMode } = useTheme()
   const bg     = darkMode ? '#0B0F19' : '#F9FAFB'
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
 
   const [peligros, setPeligros]         = useState([])
   const [matriz, setMatriz]             = useState(null)
   const [loading, setLoading]           = useState(true)
   const [modalNuevo, setModalNuevo]     = useState(false)
   const [modalDetalle, setModalDetalle] = useState(null)
-  const [modalTab, setModalTab]         = useState('evaluacion')
+  const [modalTab, setModalTab]         = useState('info')
   const [searchParams, setSearchParams] = useSearchParams()
 
   const cargar = () => {
     setLoading(true)
     Promise.all([riesgosAPI.getPeligros(), riesgosAPI.getMatriz()])
       .then(([p, m]) => { setPeligros(p.data); setMatriz(m.data) })
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setLoading(false))
   }
 
@@ -452,11 +626,13 @@ export default function Riesgos() {
     if (!riesgoId || peligros.length === 0) return
     const encontrado = peligros.find(p => String(p.id) === riesgoId)
     if (encontrado) {
-      setModalTab(searchParams.get('control') ? 'controles' : 'evaluacion')
+      setModalTab(searchParams.get('control') ? 'controles' : searchParams.get('evaluar') ? 'evaluacion' : 'info')
       setModalDetalle(encontrado)
     }
     setSearchParams({})
   }, [peligros, searchParams])
+
+  const { paginaItems: peligrosPagina, pagina, totalPaginas, setPagina } = usePaginacion(peligros)
 
   const matrizItems = [
     { label: 'Crítico',  key: 'criticos',  color: 'text-red-400',    bg: 'bg-red-500/10' },
@@ -504,28 +680,33 @@ export default function Riesgos() {
           <p className="text-sm" style={{ color: sub }}>No hay peligros identificados.</p>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {peligros.map(p => (
+          {peligrosPagina.map(p => (
             <div key={p.id} className="rounded-xl p-5 flex flex-col gap-3"
                  style={{ backgroundColor: card, border: `1px solid ${border}` }}>
               <div className="flex items-start justify-between gap-2">
-                <p className="font-semibold text-sm capitalize" style={{ color: text }}>{p.tipo}</p>
+                <p className="font-semibold text-sm" style={{ color: text }}>{normalizarTipo(p.tipo)}</p>
                 <Badge text={p.activo ? 'Activo' : 'Inactivo'}
                        colorClass={p.activo ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300'} />
               </div>
-              <p className="text-xs leading-relaxed line-clamp-2" style={{ color: sub }}>{p.descripcion}</p>
+              <p className="text-xs leading-relaxed line-clamp-2" style={{ color: sub }} title={p.descripcion}>{p.descripcion}</p>
               <div className="flex items-center gap-1 text-xs" style={{ color: sub }}>
                 <Users className="w-3.5 h-3.5 shrink-0" />
                 {p.trabajadores_expuestos} trabajadores expuestos
               </div>
-              <button onClick={() => setModalDetalle(p)}
-                      className="text-xs font-semibold hover:underline text-left mt-auto"
-                      style={{ color: '#6366F1' }}>
-                Ver evaluación →
-              </button>
+              <div className="flex justify-end mt-auto pt-1">
+                <button onClick={() => setModalDetalle(p)}
+                        className="text-xs font-semibold rounded-lg px-3 py-1.5 transition hover:opacity-90"
+                        style={{ backgroundColor: '#6366F1', color: '#FFFFFF' }}>
+                  Ver evaluación →
+                </button>
+              </div>
             </div>
           ))}
         </div>
+        <Paginador pagina={pagina} totalPaginas={totalPaginas} onCambiar={setPagina} darkMode={darkMode} />
+        </>
       )}
 
       {modalNuevo && (

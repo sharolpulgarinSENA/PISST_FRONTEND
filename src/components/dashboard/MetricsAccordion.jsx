@@ -1,25 +1,32 @@
 import { useState } from "react";
 import { ChevronDown, Info } from "lucide-react";
+import PropTypes from "prop-types";
 
 export default function MetricsAccordion({
   title,
+  tooltip,
   metrics,
   withProgress = false,
-  defaultOpen = true,
+  defaultOpen = false,
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const id = title.replace(/\s+/g, '-').toLowerCase();
 
   return (
     <section className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={`accordion-${id}`}
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition"
       >
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
             {title}
           </h3>
-          <Info className="w-4 h-4 text-gray-400" />
+          {tooltip && (
+            <Info className="w-4 h-4 text-gray-400" title={tooltip} aria-label={tooltip} />
+          )}
         </div>
         <ChevronDown
           className={`w-5 h-5 text-gray-400 transition-transform ${
@@ -29,6 +36,7 @@ export default function MetricsAccordion({
       </button>
 
       <div
+        id={`accordion-${id}`}
         className={`grid transition-all duration-300 ${
           open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
         }`}
@@ -83,4 +91,22 @@ export default function MetricsAccordion({
       </div>
     </section>
   );
+}
+
+MetricsAccordion.propTypes = {
+  title:        PropTypes.string.isRequired,
+  tooltip:      PropTypes.string,
+  metrics:      PropTypes.arrayOf(PropTypes.shape({
+    id:            PropTypes.string.isRequired,
+    label:         PropTypes.string,
+    value:         PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    delta:         PropTypes.string,
+    deltaPositive: PropTypes.bool,
+    Icon:          PropTypes.elementType,
+    iconColor:     PropTypes.string,
+    barColor:      PropTypes.string,
+    progress:      PropTypes.number,
+  })).isRequired,
+  withProgress: PropTypes.bool,
+  defaultOpen:  PropTypes.bool,
 }

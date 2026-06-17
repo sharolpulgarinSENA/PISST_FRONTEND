@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import Sidebar from './layout/Sidebar'
 import Navbar from './layout/Navbar'
@@ -6,6 +6,8 @@ import MobileBottomNav from './layout/MobileBottomNav'
 import SasbotWidget from './chat/SasbotWidget'
 import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
+import ErrorBoundary from './ErrorBoundary'
+import { ROLES } from '../constants/roles'
 
 const routeToNavSST = {
   '/dashboard':      'dashboard',
@@ -13,6 +15,7 @@ const routeToNavSST = {
   '/riesgos':        'evaluacion',
   '/capacitaciones': 'capacitaciones',
   '/auditorias':     'auditorias',
+  '/usuarios':       'mas',
 }
 
 const navToRouteSST = {
@@ -44,11 +47,15 @@ export default function Layout() {
   const navigate  = useNavigate()
   const location  = useLocation()
 
-  const esGerencia = user?.role?.toString?.().toLowerCase?.() === 'gerencia'
+  const esGerencia = user?.role?.toString?.().toLowerCase?.() === ROLES.GERENCIA
   const routeToNav = esGerencia ? routeToNavGerencia : routeToNavSST
   const navToRoute = esGerencia ? navToRouteGerencia : navToRouteSST
 
   const activeNav = routeToNav[location.pathname] || 'dashboard'
+
+  useEffect(() => {
+    document.querySelector('main')?.scrollTo({ top: 0 })
+  }, [location.pathname])
 
   const handleNavChange = (id) => {
     const path = navToRoute[id]
@@ -68,9 +75,9 @@ export default function Layout() {
           onMenuClick={() => setSidebarOpen(true)}
         />
         <main className="flex-1 overflow-y-auto pb-16 lg:pb-0">
-          {/* Se mantiene el outlet context para que las páginas existentes
-              (Capacitaciones, etc.) sigan usando useOutletContext sin cambios */}
-          <Outlet context={{ darkMode }} />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
 

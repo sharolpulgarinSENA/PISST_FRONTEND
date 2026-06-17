@@ -58,9 +58,3 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
-
-// export const authAPI = {
-//   cambiarPassword: (data) => api.post("/auth/cambiar-password", data),
-//   forgotPassword:  (data) => api.post("/auth/forgot-password",  data),
-//   resetPassword:   (data) => api.post("/auth/reset-password",   data),
-// };

@@ -55,7 +55,8 @@ export default function EmpleadoPerfil() {
       })
       .catch(() => setErrorCarga(true))
       .finally(() => setCargando(false))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time mount fetch; updateUser in deps would cause an infinite loop
+  }, [])
 
   /* ── Foto handlers ── */
   const handleFotoChange = (e) => {
@@ -176,7 +177,7 @@ export default function EmpleadoPerfil() {
   return (
     <div style={{
       padding: '28px 32px', overflowY: 'auto',
-      height: 'calc(100vh - 60px)', boxSizing: 'border-box',
+      height: '100%', boxSizing: 'border-box',
       backgroundColor: tk.bg
     }}>
 
@@ -188,10 +189,10 @@ export default function EmpleadoPerfil() {
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+      <div className="empleado-perfil-layout" style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
 
         {/* ── SIDEBAR TABS ── */}
-        <div style={{ width: 180, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="empleado-perfil-tabs" style={{ width: 180, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {[
             { id: 'info',     label: 'Información personal', icon: User },
             { id: 'password', label: 'Cambiar contraseña',   icon: Lock },
@@ -278,7 +279,7 @@ export default function EmpleadoPerfil() {
                           color: '#fff', fontSize: 12, fontWeight: 600
                         }}>
                           {subiendoFoto
-                            ? <><Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> Subiendo...</>
+                            ? <><Loader size={12} className="motion-safe:animate-spin" /> Subiendo...</>
                             : fotoOk
                               ? <><CheckCircle size={12} /> Guardada</>
                               : <><Upload size={12} /> Guardar foto</>
@@ -287,6 +288,11 @@ export default function EmpleadoPerfil() {
                       )}
                     </div>
                     <div style={{ fontSize: 12, color: tk.textFaint }}>JPG, PNG o WEBP · Máx. 2MB</div>
+                    {!fotoFile && (
+                      <div style={{ fontSize: 11, color: tk.textFaint, marginTop: 4 }}>
+                        Selecciona una imagen y luego presiona "Guardar foto".
+                      </div>
+                    )}
                     {fotoError && (
                       <div style={{ fontSize: 12, color: '#EF4444', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
                         <AlertCircle size={12} /> {fotoError}
@@ -303,7 +309,7 @@ export default function EmpleadoPerfil() {
 
                 {cargando && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: tk.textFaint, fontSize: 13, marginBottom: 16 }}>
-                    <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Cargando tu información...
+                    <Loader size={14} className="motion-safe:animate-spin" /> Cargando tu información...
                   </div>
                 )}
 
@@ -318,7 +324,7 @@ export default function EmpleadoPerfil() {
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px' }}>
+                <div className="empleado-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px' }}>
                   {/* Nombre */}
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Nombre completo</label>
@@ -388,7 +394,7 @@ export default function EmpleadoPerfil() {
                   opacity: guardando || cargando ? 0.7 : 1
                 }}>
                   {guardando
-                    ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</>
+                    ? <><Loader size={14} className="motion-safe:animate-spin" /> Guardando...</>
                     : guardado
                       ? <><CheckCircle size={14} /> Cambios guardados</>
                       : <><Save size={14} /> Guardar cambios</>
@@ -479,7 +485,7 @@ export default function EmpleadoPerfil() {
                   opacity: cambiando ? 0.7 : 1, transition: 'opacity 0.2s'
                 }}>
                   {cambiando
-                    ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Actualizando...</>
+                    ? <><Loader size={14} className="motion-safe:animate-spin" /> Actualizando...</>
                     : 'Actualizar contraseña'
                   }
                 </button>

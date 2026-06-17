@@ -1,16 +1,50 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTema } from './EmpleadoLayout'
-import { incidentesAPI } from '../../../services/api'
+import { useAuth } from '../../../context/AuthContext'
+import { incidentesAPI, getErrorMessage } from '../../../services/api'
+import { normFecha, fmtFecha } from '../../../utils/dates'
+import Spinner from '../../../components/Spinner'
 import {
-  AlertTriangle, CheckCircle, ChevronLeft, Plus, Trash2
+  AlertTriangle, CheckCircle, ChevronLeft, Plus, Trash2, Loader, ClipboardList, Bandage, Users, Send
 } from 'lucide-react'
+
+
+/* Busca el primer campo no vacío entre varios nombres posibles del backend */
+function campoReporte(reporte, candidatos) {
+  for (const c of candidatos) {
+    if (reporte[c] !== undefined && reporte[c] !== null && reporte[c] !== '') return reporte[c]
+  }
+  return null
+}
+
+const ESTADO_REPORTE = {
+  borrador:         { label: 'Borrador',        color: '#CBD5E1', bg: 'rgba(156,163,175,0.12)' },
+  en_revision:      { label: 'En revisión',     color: '#3B82F6', bg: 'rgba(59,130,246,0.12)'  },
+  abierto:          { label: 'Abierto',         color: '#22C55E', bg: 'rgba(34,197,94,0.12)'   },
+  en_investigacion: { label: 'En investigación', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)'  },
+  cerrado:          { label: 'Cerrado',         color: '#EF4444', bg: 'rgba(239,68,68,0.12)'   },
+}
+
+const SEVERIDAD_LABEL = {
+  sin_lesion: 'Sin lesión', leve: 'Leve', moderada: 'Moderada', grave: 'Grave', mortal: 'Mortal',
+}
+
+function Badge({ texto, color, bg }) {
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: '3px 9px',
+      borderRadius: 20, color, backgroundColor: bg,
+      border: `1px solid ${color}33`, whiteSpace: 'nowrap'
+    }}>{texto}</span>
+  )
+}
 
 /* ─── Opciones según enums del backend ─── */
 const TIPOS = [
   { value: 'accidente',          label: 'Accidente de trabajo'   },
   { value: 'incidente',          label: 'Incidente'              },
-  { value: 'cuasi_accidente',    label: 'Cuasi accidente'        },
+  { value: 'cuasi_accidente',    label: 'Cuasi Accidente'        },
   { value: 'condicion_insegura', label: 'Condición insegura'     },
 ]
 
@@ -22,11 +56,12 @@ const SEVERIDADES = [
   { value: 'mortal',     label: 'Mortal'      },
 ]
 
-const PARTES_CUERPO = [
-  'Cabeza', 'Cuello', 'Hombro', 'Brazo', 'Codo', 'Antebrazo',
-  'Muñeca', 'Mano', 'Dedos mano', 'Tórax', 'Abdomen', 'Espalda',
-  'Columna', 'Cadera', 'Muslo', 'Rodilla', 'Pierna', 'Tobillo',
-  'Pie', 'Dedos pie', 'Ojos', 'Oídos', 'Otro'
+const PARTES_CUERPO_GRUPOS = [
+  { grupo: 'Cabeza y cuello',   opciones: ['Cabeza', 'Cuello', 'Ojos', 'Oídos'] },
+  { grupo: 'Tronco',            opciones: ['Tórax', 'Abdomen', 'Espalda', 'Columna'] },
+  { grupo: 'Extremidad superior', opciones: ['Hombro', 'Brazo', 'Codo', 'Antebrazo', 'Muñeca', 'Mano', 'Dedos mano'] },
+  { grupo: 'Extremidad inferior', opciones: ['Cadera', 'Muslo', 'Rodilla', 'Pierna', 'Tobillo', 'Pie', 'Dedos pie'] },
+  { grupo: 'Otro',              opciones: ['Otro'] },
 ]
 
 /* ─── Componente campo ─── */
@@ -44,7 +79,43 @@ function Campo({ label, required, children, error }) {
 
 export default function EmpleadoReporte() {
   const { tk }   = useTema()
+  const { user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  /* ── Pestaña activa: 'nuevo' | 'mis' ── */
+  const [vista, setVista] = useState(searchParams.get('vista') === 'mis' ? 'mis' : 'nuevo')
+  const [misReportes,  setMisReportes]  = useState([])
+  const [cargandoMios, setCargandoMios] = useState(false)
+  const [errorMios,    setErrorMios]    = useState(null)
+
+  const cargarMisReportes = () => {
+    setCargandoMios(true)
+    setErrorMios(null)
+    incidentesAPI.getAll()
+      .then(res => {
+        const todos = res.data || []
+        const propios = todos.filter(r => {
+          const creadorId = campoReporte(r, ['creado_por_id', 'usuario_id', 'reportado_por_id'])
+          if (creadorId) return String(creadorId) === String(user?.id)
+          const creadorNombre = campoReporte(r, ['creado_por_nombre', 'usuario_nombre', 'reportado_por_nombre', 'reportado_por'])
+          return creadorNombre && creadorNombre === user?.nombre
+        })
+        setMisReportes(propios)
+      })
+      .catch(err => setErrorMios(getErrorMessage(err, 'No se pudieron cargar tus reportes.')))
+      .finally(() => setCargandoMios(false))
+  }
+
+  const irAMisReportes = () => { setVista('mis'); cargarMisReportes() }
+
+  /* Deep link desde notificaciones: /empleado/reporte?vista=mis */
+  useEffect(() => {
+    if (searchParams.get('vista') === 'mis') {
+      cargarMisReportes()
+      setSearchParams({})
+    }
+  }, [])
 
   /* ── Estado del formulario ── */
   const [form, setForm] = useState({
@@ -165,7 +236,7 @@ export default function EmpleadoReporte() {
     return (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: 'calc(100vh - 60px)', backgroundColor: tk.bg
+        height: '100%', backgroundColor: tk.bg
       }}>
         <div style={{
           textAlign: 'center', maxWidth: 480, padding: 40,
@@ -198,6 +269,15 @@ export default function EmpleadoReporte() {
               Nuevo reporte
             </button>
             <button
+              onClick={() => { setExito(null); irAMisReportes() }}
+              style={{
+                padding: '10px 20px', borderRadius: 8, cursor: 'pointer',
+                border: `1px solid ${tk.border}`, backgroundColor: tk.sidebar,
+                color: tk.textMuted, fontSize: 13
+              }}>
+              Ver mis reportes
+            </button>
+            <button
               onClick={() => navigate('/empleado/chat')}
               style={{
                 padding: '10px 20px', borderRadius: 8, cursor: 'pointer',
@@ -215,13 +295,13 @@ export default function EmpleadoReporte() {
   /* ── Formulario principal ── */
   return (
     <div style={{
-      height: 'calc(100vh - 60px)', overflowY: 'auto',
+      height: '100%', overflowY: 'auto',
       backgroundColor: tk.bg, color: tk.text
     }}>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '32px 24px' }}>
 
         {/* Encabezado */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <button
             onClick={() => navigate('/empleado/chat')}
             style={{
@@ -234,14 +314,45 @@ export default function EmpleadoReporte() {
           </button>
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: tk.text, margin: 0 }}>
-              Nuevo reporte de incidente
+              {vista === 'nuevo' ? 'Nuevo reporte de incidente' : 'Mis reportes'}
             </h1>
             <p style={{ fontSize: 12, color: tk.textFaint, margin: 0, marginTop: 2 }}>
-              Completa todos los campos obligatorios marcados con *
+              {vista === 'nuevo'
+                ? 'Completa todos los campos obligatorios marcados con *'
+                : 'Reportes de incidentes que has enviado y su estado actual'}
             </p>
           </div>
         </div>
 
+        {/* Pestañas */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: `1px solid ${tk.border}` }}>
+          {[
+            { id: 'nuevo', label: 'Nuevo reporte', icon: Plus },
+            { id: 'mis',   label: 'Mis reportes',  icon: ClipboardList },
+          ].map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => id === 'mis' ? irAMisReportes() : setVista(id)} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '9px 16px', marginBottom: -1,
+              border: 'none', borderBottom: `2px solid ${vista === id ? '#6366F1' : 'transparent'}`,
+              backgroundColor: 'transparent', cursor: 'pointer',
+              color: vista === id ? '#818CF8' : tk.textMuted,
+              fontSize: 13, fontWeight: vista === id ? 600 : 400
+            }}>
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+        </div>
+
+        {vista === 'mis' ? (
+          <MisReportes
+            tk={tk}
+            cargando={cargandoMios}
+            error={errorMios}
+            reportes={misReportes}
+            onReintentar={cargarMisReportes}
+          />
+        ) : (
+        <>
         {/* Error API */}
         {errorApi && (
           <div style={{
@@ -260,10 +371,10 @@ export default function EmpleadoReporte() {
           backgroundColor: tk.card, border: `1px solid ${tk.border}`,
           borderRadius: 12, padding: 24, marginBottom: 16
         }}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: tk.text, marginBottom: 20, marginTop: 0 }}>
-            📋 Datos del incidente
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: tk.text, marginBottom: 20, marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ClipboardList size={16} /> Datos del incidente
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="empleado-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
             <Campo label="Tipo de incidente" required error={errores.tipo}>
               <select value={form.tipo} onChange={e => set('tipo', e.target.value)} style={selectStyle('tipo')}>
@@ -323,8 +434,8 @@ export default function EmpleadoReporte() {
           borderRadius: 12, padding: 24, marginBottom: 16
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: form.con_lesion ? 20 : 0 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: tk.text, margin: 0 }}>
-              🩹 Información de lesión
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: tk.text, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Bandage size={16} /> Información de lesión
             </h2>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: tk.textMuted }}>
               <input
@@ -338,7 +449,7 @@ export default function EmpleadoReporte() {
           </div>
 
           {form.con_lesion && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="empleado-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <Campo label="Tipo de lesión" error={errores.tipo_lesion}>
                 <input
                   type="text"
@@ -355,7 +466,11 @@ export default function EmpleadoReporte() {
                   onChange={e => set('parte_afectada', e.target.value)}
                   style={selectStyle('parte_afectada')}>
                   <option value="">Seleccionar...</option>
-                  {PARTES_CUERPO.map(p => <option key={p} value={p}>{p}</option>)}
+                  {PARTES_CUERPO_GRUPOS.map(g => (
+                    <optgroup key={g.grupo} label={g.grupo}>
+                      {g.opciones.map(p => <option key={p} value={p}>{p}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </Campo>
 
@@ -378,8 +493,8 @@ export default function EmpleadoReporte() {
           borderRadius: 12, padding: 24, marginBottom: 24
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: form.testigos.length > 0 ? 16 : 0 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: tk.text, margin: 0 }}>
-              👥 Testigos <span style={{ fontSize: 12, fontWeight: 400, color: tk.textFaint }}>(opcional)</span>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: tk.text, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Users size={16} /> Testigos <span style={{ fontSize: 12, fontWeight: 400, color: tk.textFaint }}>(opcional)</span>
             </h2>
             <button
               onClick={addTestigo}
@@ -394,7 +509,7 @@ export default function EmpleadoReporte() {
           </div>
 
           {form.testigos.map((t, i) => (
-            <div key={i} style={{
+            <div key={i} className="empleado-form-grid-3" style={{
               display: 'grid', gridTemplateColumns: '1fr 1fr auto',
               gap: 12, alignItems: 'end',
               padding: '12px 0',
@@ -420,13 +535,16 @@ export default function EmpleadoReporte() {
               </Campo>
               <button
                 onClick={() => removeTestigo(i)}
+                aria-label={`Eliminar testigo ${i + 1}`}
                 style={{
-                  padding: '10px', borderRadius: 8, cursor: 'pointer',
+                  padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
                   border: `1px solid rgba(239,68,68,0.3)`,
                   backgroundColor: 'rgba(239,68,68,0.08)',
-                  color: '#EF4444', display: 'flex', alignItems: 'center'
+                  color: '#EF4444', display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap'
                 }}>
-                <Trash2 size={14} />
+                <Trash2 size={13} />
+                <span>Eliminar</span>
               </button>
             </div>
           ))}
@@ -454,11 +572,91 @@ export default function EmpleadoReporte() {
               fontSize: 14, fontWeight: 600,
               display: 'flex', alignItems: 'center', gap: 8
             }}>
-            {enviando ? 'Enviando...' : '✓ Enviar reporte'}
+            {enviando ? 'Enviando...' : <><Send size={14} /> Enviar reporte</>}
           </button>
         </div>
+        </>
+        )}
 
       </div>
+    </div>
+  )
+}
+
+/* ── Pestaña "Mis reportes": lista de reportes propios con su estado ── */
+function MisReportes({ tk, cargando, error, reportes, onReintentar }) {
+  if (cargando) return <Spinner />
+
+  if (error) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+        padding: '40px 0', textAlign: 'center'
+      }}>
+        <AlertTriangle size={32} color="#EF4444" />
+        <p style={{ fontSize: 13, color: tk.textMuted, margin: 0 }}>{error}</p>
+        <button onClick={onReintentar} style={{
+          padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
+          border: `1px solid ${tk.border}`, backgroundColor: tk.card,
+          color: tk.textMuted, fontSize: 13
+        }}>
+          Reintentar
+        </button>
+      </div>
+    )
+  }
+
+  if (reportes.length === 0) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+        padding: '48px 0', textAlign: 'center'
+      }}>
+        <ClipboardList size={36} color={tk.textFaint} />
+        <p style={{ fontSize: 13, color: tk.textFaint, margin: 0 }}>
+          Aún no has enviado ningún reporte de incidente.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+      {reportes.map(r => {
+        const estado = ESTADO_REPORTE[r.estado] || ESTADO_REPORTE.borrador
+        return (
+          <div key={r.id} style={{
+            padding: 16, borderRadius: 12,
+            backgroundColor: tk.card, border: `1px solid ${tk.border}`,
+            display: 'flex', flexDirection: 'column', gap: 8
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>
+                {TIPOS.find(t => t.value === r.tipo)?.label || r.tipo}
+              </span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <Badge texto={estado.label} color={estado.color} bg={estado.bg} />
+                {r.severidad && (
+                  <Badge texto={SEVERIDAD_LABEL[r.severidad] || r.severidad} color={tk.textMuted} bg={tk.sidebar} />
+                )}
+              </div>
+            </div>
+            {r.descripcion && (
+              <p style={{
+                fontSize: 12, color: tk.textFaint, margin: 0, lineHeight: 1.5,
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              }}>
+                {r.descripcion}
+              </p>
+            )}
+            <div style={{ fontSize: 12, color: tk.textFaint, display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span>{r.lugar}</span>
+              <span>·</span>
+              <span>{fmtFecha(r.fecha)}</span>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

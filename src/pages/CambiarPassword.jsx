@@ -1,23 +1,16 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Check, X, Lock, ShieldCheck } from "lucide-react";
-import { authAPI } from "../services/api";
+import { authAPI, getErrorMessage } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import { ROLES } from "../constants/roles";
 
 const REQUISITOS = [
   { id: "longitud",  label: "Mínimo 8 caracteres",                           test: (p) => p.length >= 8 },
   { id: "mayuscula", label: "Al menos una mayúscula",                        test: (p) => /[A-Z]/.test(p) },
   { id: "simbolo",   label: 'Al menos un símbolo (!@#$%^&*(),.?":{}|<>_-)', test: (p) => /[!@#$%^&*(),.?":{}|<>_\-]/.test(p) },
 ];
-
-function extraerDetalle(err) {
-  const detail = err.response?.data?.detail;
-  if (!detail) return null;
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail)) return detail.map((d) => d.msg).filter(Boolean).join(" · ");
-  return null;
-}
 
 /* ──────────────────────────────────────────
    CampoPassword FUERA del padre para que
@@ -75,15 +68,18 @@ export default function CambiarPassword() {
   const { user }   = useAuth();
   const { darkMode } = useTheme();
 
-  // Guard: si no hay flag, el usuario ya cambió su contraseña
+  // Guard: si no hay flag, el usuario ya cambió su contraseña.
+  // Espera a que `user` esté disponible para no decidir la ruta con datos parciales.
   useEffect(() => {
+    if (!user) return;
     const debe = sessionStorage.getItem("pisst_debe_cambiar_password");
     if (!debe) {
       const role = user?.role;
-      if (role === "sst" || role === "gerencia") navigate("/dashboard", { replace: true });
+      if (role === ROLES.SST || role === ROLES.GERENCIA) navigate("/dashboard", { replace: true });
+      else if (role === ROLES.EMPLEADO) navigate("/empleado/chat", { replace: true });
       else navigate("/chat", { replace: true });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, navigate]);
 
   // Tema
   const theme = {
@@ -91,7 +87,7 @@ export default function CambiarPassword() {
     card:   darkMode ? "#111827" : "#FFFFFF",
     border: darkMode ? "#1F2937" : "#E5E7EB",
     text:   darkMode ? "#F9FAFB" : "#111827",
-    sub:    darkMode ? "#9CA3AF" : "#6B7280",
+    sub:    darkMode ? "#CBD5E1" : "#6B7280",
     input:  darkMode ? "#1F2937" : "#F3F4F6",
   };
 
@@ -129,10 +125,10 @@ export default function CambiarPassword() {
       sessionStorage.removeItem("pisst_debe_cambiar_password");
       setOk(true);
       const role    = user?.role;
-      const destino = role === "sst" || role === "gerencia" ? "/dashboard" : "/chat";
+      const destino = role === ROLES.SST || role === ROLES.GERENCIA ? "/dashboard" : "/chat";
       setTimeout(() => navigate(destino), 1200);
     } catch (err) {
-      setError(extraerDetalle(err) || "Error al cambiar la contraseña. Inténtalo de nuevo.");
+      setError(getErrorMessage(err, "Error al cambiar la contraseña. Inténtalo de nuevo."));
     } finally {
       setLoading(false);
     }

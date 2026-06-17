@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, FolderOpen, Download, Loader2, AlertCircle } from "lucide-react";
+import { ChevronDown, FolderOpen, Download, Loader2, AlertCircle, X } from "lucide-react";
 import { metricasAPI } from "../../services/api";
 
 const reports = [
@@ -22,7 +22,7 @@ const EXT = {
 };
 
 export default function ReportsDocumentation() {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
   const [error, setError] = useState(null);
 
@@ -76,7 +76,10 @@ export default function ReportsDocumentation() {
             {error && (
               <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg text-sm border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300">
                 <AlertCircle className="w-4 h-4 shrink-0" />
-                {error}
+                <span className="flex-1">{error}</span>
+                <button onClick={() => setError(null)} aria-label="Cerrar" className="ml-auto p-0.5 hover:opacity-70">
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
 

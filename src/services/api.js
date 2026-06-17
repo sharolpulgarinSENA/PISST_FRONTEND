@@ -46,7 +46,8 @@ api.interceptors.response.use(
 
       if (!refreshToken) {
         sessionStorage.clear();
-        window.location.href = "/login?sesion=expirada";
+        sessionStorage.setItem('pisst_sesion_exp', '1')
+        window.location.href = '/login';
         return Promise.reject(error);
       }
 
@@ -78,7 +79,8 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         sessionStorage.clear();
-        window.location.href = "/login?sesion=expirada";
+        sessionStorage.setItem('pisst_sesion_exp', '1')
+        window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
@@ -114,7 +116,7 @@ export const authAPI = {
 // ─── Métricas ─────────────────────────────────────────────────────────────────
 export const metricasAPI = {
   getKpis:         ()        => api.get("/metricas/kpis"),
-  getDashboard:    ()        => api.get("/metricas/dashboard-gerencia"),
+  getDashboard:    (periodo) => api.get("/metricas/dashboard-gerencia", { params: periodo ? { periodo } : {} }),
   getAlertas:      ()        => api.get("/metricas/alertas"),
   getReportePdf:   (periodo) => api.get("/metricas/reporte-pdf",   { params: { periodo }, responseType: "blob" }),
   getReporteExcel: (periodo) => api.get("/metricas/reporte-excel", { params: { periodo }, responseType: "blob" }),
@@ -132,7 +134,7 @@ export const incidentesAPI = {
   actualizarInvestigacion:(id, data)             => api.patch(`/incidentes/${id}/investigacion`, data),
   getAcciones:            (id)                   => api.get(`/incidentes/${id}/acciones`),
   crearAccion:            (id, data)             => api.post(`/incidentes/${id}/acciones`, data),
-  actualizarAccion:       (accionId, data)       => api.patch(`/incidentes/acciones/${accionId}`, data), // ✅ AGREGADO
+  actualizarAccion:       (accionId, data)       => api.patch(`/incidentes/acciones/${accionId}`, data),
   descargarFurat:         (id)                   => api.get(`/incidentes/${id}/furat`, { responseType: "blob" }),
 };
 
@@ -189,14 +191,16 @@ export const capacitacionesAPI = {
   responderEvaluacion: (data)             => api.post("/capacitaciones/evaluaciones/responder", data),
   getCertificado:      (evalId, empId)    => api.get(`/capacitaciones/evaluaciones/${evalId}/certificado/${empId}`, { responseType: "blob" }),
   getHistorialEmpleado:(empId)            => api.get(`/capacitaciones/empleados/${empId}/historial`),
+  eliminar:                  (id)         => api.delete(`/capacitaciones/${id}`),
+  registrarAsistenciaPropia: (sesionId)   => api.post(`/capacitaciones/sesiones/${sesionId}/asistencia/yo`),
 };
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
 export const analyticsAPI = {
-  getIncidentes:      () => api.get("/analytics/incidentes"),
-  getRiesgos:         () => api.get("/analytics/riesgos"),
-  getCapacitaciones:  () => api.get("/analytics/capacitaciones"),
-  getCumplimiento:    () => api.get("/analytics/cumplimiento"),
+  getIncidentes:      (periodo) => api.get("/analytics/incidentes", { params: periodo ? { periodo } : {} }),
+  getRiesgos:         (periodo) => api.get("/analytics/riesgos", { params: periodo ? { periodo } : {} }),
+  getCapacitaciones:  (periodo) => api.get("/analytics/capacitaciones", { params: periodo ? { periodo } : {} }),
+  getCumplimiento:    (periodo) => api.get("/analytics/cumplimiento", { params: periodo ? { periodo } : {} }),
 };
 
 // ─── Notificaciones ───────────────────────────────────────────────────────────
@@ -219,10 +223,12 @@ export const chatAPI = {
 export const auditoriasAPI = {
   getAll:        (skip = 0, limit = 50) => api.get("/auditorias/", { params: { skip, limit } }),
   crear:         (data)                 => api.post("/auditorias/", data),
-  cambiarEstado: (id, estado)           => api.patch(`/auditorias/${id}/estado?estado=${estado}`),
+  cambiarEstado: (id, estado)           => api.patch(`/auditorias/${id}/estado`, null, { params: { estado } }),
   getProgreso:   (id)                   => api.get(`/auditorias/${id}/progreso`),
   getHallazgos:  (id)                   => api.get(`/auditorias/${id}/hallazgos`),
   crearHallazgo: (id, data)             => api.post(`/auditorias/${id}/hallazgos`, data),
   crearNC:       (hallazgoId, data)     => api.post(`/auditorias/hallazgos/${hallazgoId}/nc`, data),
   actualizarNC:  (ncId, data)           => api.patch(`/auditorias/nc/${ncId}`, data),
+  actualizarHallazgo: (hallazgoId, data) => api.patch(`/auditorias/hallazgos/${hallazgoId}`, data),
+  eliminarHallazgo:   (hallazgoId)       => api.delete(`/auditorias/hallazgos/${hallazgoId}`),
 };

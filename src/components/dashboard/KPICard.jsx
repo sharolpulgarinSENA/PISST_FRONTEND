@@ -1,4 +1,5 @@
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
+import PropTypes from 'prop-types'
 
 export default function KPICard({
   darkMode,
@@ -11,17 +12,19 @@ export default function KPICard({
   iconColor,
   trendColor,
   trend,
+  urgent = false,
+  urgentColor = '#EF4444',
 }) {
-  // Convertimos el array de números en formato que entiende recharts
-  const data = trend.map((v, i) => ({ x: i, y: v }))
-  const muted = darkMode ? '#9CA3AF' : '#6B7280'
+  const data = Array.isArray(trend) ? trend.map((v, i) => ({ x: i, y: v })) : []
+  const muted = darkMode ? '#CBD5E1' : '#6B7280'
 
   return (
     <article
-      className="rounded-2xl p-5 border transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+      className="rounded-2xl p-5 border transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden relative"
       style={{
         backgroundColor: darkMode ? '#111827' : '#FFFFFF',
-        borderColor: darkMode ? '#1F2937' : '#E5E7EB',
+        borderColor: urgent ? urgentColor : (darkMode ? '#1F2937' : '#E5E7EB'),
+        borderTopWidth: urgent ? '3px' : '1px',
       }}
     >
       {/* ====== Header: icono + label ====== */}
@@ -30,7 +33,8 @@ export default function KPICard({
           <Icon className={`w-5 h-5 ${iconColor}`} />
         </div>
         <span
-          className="text-xs text-right leading-tight max-w-[60%]"
+          className="text-xs text-right leading-tight max-w-[60%] line-clamp-2"
+          title={label}
           style={{ color: muted }}
         >
           {label}
@@ -54,20 +58,37 @@ export default function KPICard({
           {delta}
         </span>
 
-        <div className="w-20 h-8 shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
-              <Line
-                type="monotone"
-                dataKey="y"
-                stroke={trendColor}
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        {data.length > 0 && (
+          <div className="w-20 h-8 shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data}>
+                <Line
+                  type="monotone"
+                  dataKey="y"
+                  stroke={trendColor}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
     </article>
   )
+}
+
+KPICard.propTypes = {
+  darkMode:      PropTypes.bool,
+  label:         PropTypes.string.isRequired,
+  value:         PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  delta:         PropTypes.string,
+  deltaPositive: PropTypes.bool,
+  Icon:          PropTypes.elementType.isRequired,
+  iconBg:        PropTypes.string,
+  iconColor:     PropTypes.string,
+  trendColor:    PropTypes.string,
+  trend:         PropTypes.arrayOf(PropTypes.number),
+  urgent:        PropTypes.bool,
+  urgentColor:   PropTypes.string,
 }

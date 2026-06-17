@@ -1,16 +1,14 @@
-import { useState, useEffect } from 'react'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { Plus, X, ClipboardList, FileText, Search, Lightbulb, Pencil } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useTheme } from '../../../context/ThemeContext'
+import { Plus, X, ClipboardList, FileText, Search, Lightbulb, Pencil, Trash2 } from 'lucide-react'
 import { auditoriasAPI, getErrorMessage } from '../../../services/api'
-
-function getUsuarioId() {
-  try {
-    const token = sessionStorage.getItem('pisst_token')
-    if (!token) return null
-    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
-    return payload.sub || null
-  } catch { return null }
-}
+import { useAuth } from '../../../context/AuthContext'
+import { useModal } from '../../../hooks/useModal'
+import { normFecha, fmtFecha } from '../../../utils/dates'
+import { usePaginacion } from '../../../hooks/usePaginacion'
+import Paginador from '../../../components/Paginador'
+import ConfirmDialog from '../../../components/ConfirmDialog'
 
 const ESTADOS = ['planificada', 'en_ejecucion', 'completada']
 const ESTADO_COLOR = {
@@ -36,16 +34,6 @@ const NC_ESTADO_LABEL = {
   abierta: 'Abierta', en_proceso: 'En proceso', cerrada: 'Cerrada',
 }
 
-function normFecha(f) {
-  if (!f) return ''
-  return f.endsWith('Z') || f.includes('+') || /[+-]\d{2}:\d{2}$/.test(f) ? f : f + 'Z'
-}
-
-function fmtFecha(f, opts = { dateStyle: 'medium' }) {
-  if (!f) return '—'
-  return new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', ...opts }).format(new Date(normFecha(f)))
-}
-
 function Badge({ text, colorClass }) {
   return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${colorClass}`}>{text?.replace(/_/g, ' ')}</span>
 }
@@ -54,10 +42,11 @@ function Badge({ text, colorClass }) {
    MODAL: NUEVA AUDITORÍA
 ══════════════════════════════════════════ */
 function ModalNuevaAuditoria({ darkMode, onClose, onCreada }) {
+  const dialogRef = useModal(onClose)
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
   const [form, setForm]       = useState({ objetivos: '', fecha_programada: '' })
@@ -90,14 +79,20 @@ function ModalNuevaAuditoria({ darkMode, onClose, onCreada }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
-      <div className="w-full max-w-md rounded-2xl shadow-2xl"
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="modal-nueva-auditoria-title"
+           className="w-full max-w-md rounded-2xl shadow-2xl"
            style={{ backgroundColor: card, border: `1px solid ${border}` }}>
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
-          <h2 className="font-bold text-lg" style={{ color: text }}>Nueva Auditoría</h2>
-          <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+          <h2 id="modal-nueva-auditoria-title" className="font-bold text-lg" style={{ color: text }}>Nueva Auditoría</h2>
+          <button onClick={onClose} aria-label="Cerrar"><X size={18} style={{ color: sub }} /></button>
         </div>
         <div className="px-6 py-5 space-y-4">
-          {banner && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{banner}</div>}
+          {banner && (
+            <div className="text-sm rounded-lg px-4 py-3"
+                 style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#FEF2F2', border: `1px solid ${darkMode ? 'rgba(239,68,68,0.3)' : '#FECACA'}`, color: darkMode ? '#FCA5A5' : '#B91C1C' }}>
+              {banner}
+            </div>
+          )}
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Fecha programada *</label>
             <input type="datetime-local" value={form.fecha_programada}
@@ -106,7 +101,7 @@ function ModalNuevaAuditoria({ darkMode, onClose, onCreada }) {
                    style={{ backgroundColor: input, color: text }} />
           </div>
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Objetivos</label>
+            <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Objetivos (opcional)</label>
             <textarea rows={3} placeholder="Describe los objetivos de la auditoría..." value={form.objetivos}
                       onChange={e => set('objetivos', e.target.value)}
                       className="w-full rounded-lg px-3 py-2.5 text-sm outline-none border border-transparent resize-none"
@@ -129,19 +124,39 @@ function ModalNuevaAuditoria({ darkMode, onClose, onCreada }) {
 /* ══════════════════════════════════════════
    MODAL: DETALLE AUDITORÍA
 ══════════════════════════════════════════ */
+const FOCUSABLE_SEL_AD = 'button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+
 function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onActualizada }) {
+  const { user } = useAuth()
+  const dialogRef = useRef(null)
+  useEffect(() => {
+    const prev = document.activeElement
+    const el = dialogRef.current
+    el?.querySelectorAll(FOCUSABLE_SEL_AD)?.[0]?.focus()
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); return }
+      if (e.key !== 'Tab') return
+      const els = [...(el?.querySelectorAll(FOCUSABLE_SEL_AD) ?? [])]
+      if (!els.length) return
+      if (e.shiftKey && document.activeElement === els[0]) { e.preventDefault(); els.at(-1).focus() }
+      else if (!e.shiftKey && document.activeElement === els.at(-1)) { e.preventDefault(); els[0].focus() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('keydown', onKey); prev?.focus?.() }
+  }, [])
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
   const [tab, setTab]             = useState(initialTab)
   const [hallazgos, setHallazgos] = useState([])
   const [progreso, setProgreso]   = useState(null)
   const [banner, setBanner]       = useState('')
+  const [bannerOk, setBannerOk]   = useState('')
   const [loading, setLoading]     = useState(false)
-  const [estadoActual, setEstadoActual] = useState(auditoria.estado)  // ← aquí
+  const [estadoActual, setEstadoActual] = useState(auditoria.estado)
 
   const [hallazgoForm, setHallazgoForm] = useState({
     descripcion: '', clasificacion: '', evidencia: '', recomendacion: ''
@@ -149,17 +164,33 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
   const [ncForm, setNcForm]     = useState({ descripcion: '', fecha_limite: '' })
   const [ncTarget, setNcTarget] = useState(null)
   const [editingNcId, setEditingNcId]     = useState(null)
-  const [editNcForm, setEditNcForm]       = useState({ estado: '', evidencia_cierre: '' })
+  const [editNcForm, setEditNcForm]       = useState({ estado: '', evidencia_cierre: '', descripcion: '', fecha_limite: '' })
+
+  const [editingHallazgoId, setEditingHallazgoId]   = useState(null)
+  const [editHallazgoForm, setEditHallazgoForm]     = useState({ descripcion: '', clasificacion: '', evidencia: '', recomendacion: '' })
+  const [confirmEliminarHallazgo, setConfirmEliminarHallazgo] = useState(null)
+  const [confirmCompletar, setConfirmCompletar]     = useState(false)
 
   useEffect(() => {
     Promise.all([
       auditoriasAPI.getHallazgos(auditoria.id),
       auditoriasAPI.getProgreso(auditoria.id),
     ]).then(([h, p]) => { setHallazgos(h.data); setProgreso(p.data) })
-      .catch(console.error)
+      .catch(() => {})
   }, [auditoria.id])
 
-  const cambiarEstado = async (estado) => {
+  const ncsAbiertas = hallazgos.reduce(
+    (acc, h) => acc + (h.no_conformidades?.filter(nc => (nc.estado || 'abierta') === 'abierta').length || 0),
+    0
+  )
+
+  const showOk = (msg) => {
+    setBanner('')
+    setBannerOk(msg)
+    setTimeout(() => setBannerOk(''), 3000)
+  }
+
+  const ejecutarCambioEstado = async (estado) => {
     try {
       await auditoriasAPI.cambiarEstado(auditoria.id, estado)
       setEstadoActual(estado)   // ← actualiza visualmente el modal al instante
@@ -168,6 +199,14 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
     } catch (err) {
       setBanner(getErrorMessage(err, 'Error al cambiar estado.'))
     }
+  }
+
+  const cambiarEstado = (estado) => {
+    if (estado === 'completada') {
+      setConfirmCompletar(true)
+      return
+    }
+    ejecutarCambioEstado(estado)
   }
 
   const guardarHallazgo = async () => {
@@ -187,6 +226,7 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
       const r = await auditoriasAPI.getHallazgos(auditoria.id)
       setHallazgos(r.data)
       setHallazgoForm({ descripcion: '', clasificacion: '', evidencia: '', recomendacion: '' })
+      showOk('Hallazgo registrado correctamente.')
     } catch (err) {
       setBanner(getErrorMessage(err, 'Error al guardar hallazgo.'))
     } finally { setLoading(false) }
@@ -202,7 +242,7 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
       setBanner('Por favor, diligencia todos los campos obligatorios para continuar.')
       return
     }
-    const responsable_id = getUsuarioId()
+    const responsable_id = user?.id
     if (!responsable_id) { setBanner('No se pudo obtener el usuario. Intenta recargar la sesión.'); return }
     setBanner('')
     setLoading(true)
@@ -215,6 +255,7 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
       await recargarHallazgos()
       setNcTarget(null)
       setNcForm({ descripcion: '', fecha_limite: '' })
+      showOk('No conformidad creada correctamente.')
     } catch (err) {
       setBanner(getErrorMessage(err, 'Error al crear NC.'))
     } finally { setLoading(false) }
@@ -226,13 +267,50 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
       await auditoriasAPI.actualizarNC(editingNcId, {
         estado:           editNcForm.estado           || undefined,
         evidencia_cierre: editNcForm.evidencia_cierre || undefined,
+        descripcion:      editNcForm.descripcion      || undefined,
+        fecha_limite:     editNcForm.fecha_limite      ? editNcForm.fecha_limite + 'T00:00:00-05:00' : undefined,
       })
       await recargarHallazgos()
       setEditingNcId(null)
-      setBanner('')
+      showOk('No conformidad actualizada correctamente.')
     } catch (err) {
       setBanner(getErrorMessage(err, 'Error al actualizar NC.'))
     } finally { setLoading(false) }
+  }
+
+  const guardarEdicionHallazgo = async () => {
+    if (!editHallazgoForm.descripcion || !editHallazgoForm.clasificacion) {
+      setBanner('Por favor, diligencia todos los campos obligatorios para continuar.')
+      return
+    }
+    setBanner('')
+    setLoading(true)
+    try {
+      await auditoriasAPI.actualizarHallazgo(editingHallazgoId, {
+        descripcion:   editHallazgoForm.descripcion,
+        clasificacion: editHallazgoForm.clasificacion,
+        evidencia:     editHallazgoForm.evidencia || undefined,
+        recomendacion: editHallazgoForm.recomendacion || undefined,
+      })
+      await recargarHallazgos()
+      setEditingHallazgoId(null)
+    } catch (err) {
+      setBanner(getErrorMessage(err, 'Error al actualizar hallazgo.'))
+    } finally { setLoading(false) }
+  }
+
+  const eliminarHallazgo = async (hallazgoId) => {
+    setLoading(true)
+    try {
+      await auditoriasAPI.eliminarHallazgo(hallazgoId)
+      await recargarHallazgos()
+      setBanner('')
+    } catch (err) {
+      setBanner(getErrorMessage(err, 'Error al eliminar hallazgo.'))
+    } finally {
+      setLoading(false)
+      setConfirmEliminarHallazgo(null)
+    }
   }
 
   const tabs = [
@@ -243,19 +321,20 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
-      <div className="w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col"
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="modal-detalle-auditoria-title"
+           className="w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col"
            style={{ backgroundColor: card, border: `1px solid ${border}` }}>
 
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
           <div>
-            <h2 className="font-bold text-lg" style={{ color: text }}>
+            <h2 id="modal-detalle-auditoria-title" className="font-bold text-lg" style={{ color: text }}>
               Auditoría — {fmtFecha(auditoria.fecha_programada)}
             </h2>
             <p className="text-xs mt-0.5" style={{ color: sub }}>
               {auditoria.objetivos || 'Sin objetivos registrados'}
             </p>
           </div>
-          <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+          <button onClick={onClose} aria-label="Cerrar"><X size={18} style={{ color: sub }} /></button>
         </div>
 
         <div className="flex border-b px-6" style={{ borderColor: border }}>
@@ -269,7 +348,18 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          {banner && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{banner}</div>}
+          {banner && (
+            <div className="text-sm rounded-lg px-4 py-3"
+                 style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#FEF2F2', border: `1px solid ${darkMode ? 'rgba(239,68,68,0.3)' : '#FECACA'}`, color: darkMode ? '#FCA5A5' : '#B91C1C' }}>
+              {banner}
+            </div>
+          )}
+          {bannerOk && (
+            <div className="text-sm rounded-lg px-4 py-3"
+                 style={{ backgroundColor: darkMode ? 'rgba(34,197,94,0.1)' : '#F0FDF4', border: `1px solid ${darkMode ? 'rgba(34,197,94,0.3)' : '#BBF7D0'}`, color: darkMode ? '#86EFAC' : '#15803D' }}>
+              {bannerOk}
+            </div>
+          )}
 
           {/* ── TAB INFO ── */}
           {tab === 'info' && (
@@ -301,19 +391,41 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
               )}
 
               <div>
-                <p className="text-xs font-medium mb-2" style={{ color: sub }}>Cambiar estado</p>
-                <div className="flex flex-wrap gap-2">
-                  {ESTADOS.map(e => (
-                    <button key={e} onClick={() => cambiarEstado(e)}
-                            className="text-xs px-3 py-1.5 rounded-lg font-medium transition hover:opacity-80"
-                            style={{
-                              backgroundColor: estadoActual === e ? '#6366F1' : input,
-                              color: estadoActual === e ? '#fff' : text,
-                              border: `1px solid ${border}`
-                            }}>
-                      {ESTADO_LABEL[e]}
-                    </button>
-                  ))}
+                <p className="text-xs font-medium mb-3" style={{ color: sub }}>Avanzar estado</p>
+                <div className="flex items-center gap-1">
+                  {ESTADOS.map((e, idx) => {
+                    const currentIdx = ESTADOS.indexOf(estadoActual)
+                    const isCurrent  = estadoActual === e
+                    const isDone     = idx < currentIdx
+                    const isNext     = idx === currentIdx + 1
+                    return (
+                      <div key={e} className="flex items-center" style={{ flex: idx < ESTADOS.length - 1 ? '1' : 'none' }}>
+                        <button
+                          onClick={() => cambiarEstado(e)}
+                          disabled={isCurrent || idx < currentIdx}
+                          title={isCurrent ? 'Estado actual' : isDone ? 'Ya completado' : `Avanzar a ${ESTADO_LABEL[e]}`}
+                          className="flex flex-col items-center gap-1 disabled:cursor-default transition"
+                          style={{ opacity: isDone ? 0.5 : 1 }}
+                        >
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                               style={{
+                                 backgroundColor: isCurrent ? '#6366F1' : isDone ? '#22C55E' : isNext ? darkMode ? '#374151' : '#E5E7EB' : darkMode ? '#1F2937' : '#F3F4F6',
+                                 color: isCurrent || isDone ? '#fff' : sub,
+                                 border: isNext ? `2px dashed #6366F1` : 'none',
+                               }}>
+                            {isDone ? '✓' : idx + 1}
+                          </div>
+                          <span className="text-xs whitespace-nowrap" style={{ color: isCurrent ? '#6366F1' : sub, fontWeight: isCurrent ? 600 : 400 }}>
+                            {ESTADO_LABEL[e]}
+                          </span>
+                        </button>
+                        {idx < ESTADOS.length - 1 && (
+                          <div className="flex-1 h-px mx-1 mt-[-10px]"
+                               style={{ backgroundColor: isDone ? '#22C55E' : darkMode ? '#374151' : '#E5E7EB' }} />
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -328,33 +440,108 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
               {hallazgos.map(h => (
                 <div key={h.id} className="rounded-lg p-4 space-y-2"
                      style={{ backgroundColor: input }}>
+                  {editingHallazgoId === h.id ? (
+                    <div className="space-y-2">
+                      <textarea rows={2} placeholder="Describe el hallazgo..." value={editHallazgoForm.descripcion}
+                                onChange={e => setEditHallazgoForm(f => ({ ...f, descripcion: e.target.value }))}
+                                className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none"
+                                style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
+                      <select value={editHallazgoForm.clasificacion}
+                              onChange={e => setEditHallazgoForm(f => ({ ...f, clasificacion: e.target.value }))}
+                              className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+                              style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }}>
+                        <option value="">Clasificación...</option>
+                        <option value="conformidad">Conformidad</option>
+                        <option value="no_conformidad_menor">No conformidad menor</option>
+                        <option value="no_conformidad_mayor">No conformidad mayor</option>
+                        <option value="observacion">Observación</option>
+                      </select>
+                      <input type="text" placeholder="Evidencia (opcional)" value={editHallazgoForm.evidencia}
+                             onChange={e => setEditHallazgoForm(f => ({ ...f, evidencia: e.target.value }))}
+                             className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+                             style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
+                      <input type="text" placeholder="Recomendación (opcional)" value={editHallazgoForm.recomendacion}
+                             onChange={e => setEditHallazgoForm(f => ({ ...f, recomendacion: e.target.value }))}
+                             className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+                             style={{ backgroundColor: card, color: text, border: `1px solid ${border}` }} />
+                      <div className="flex gap-2">
+                        <button onClick={guardarEdicionHallazgo} disabled={loading}
+                                className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
+                                style={{ backgroundColor: '#6366F1' }}>
+                          {loading ? 'Guardando...' : 'Guardar'}
+                        </button>
+                        <button onClick={() => setEditingHallazgoId(null)}
+                                className="px-3 py-1.5 rounded-lg text-xs" style={{ color: sub }}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                  <>
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-medium" style={{ color: text }}>{h.descripcion}</p>
-                    <Badge text={h.clasificacion} colorClass={CLASIFICACION_COLOR[h.clasificacion] || 'bg-gray-500/20 text-gray-300'} />
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge text={h.clasificacion} colorClass={CLASIFICACION_COLOR[h.clasificacion] || 'bg-gray-500/20 text-gray-300'} />
+                      <button
+                        onClick={() => { setEditingHallazgoId(h.id); setEditHallazgoForm({ descripcion: h.descripcion || '', clasificacion: h.clasificacion || '', evidencia: h.evidencia || '', recomendacion: h.recomendacion || '' }) }}
+                        className="p-1.5 rounded-lg hover:opacity-70 transition"
+                        style={{ backgroundColor: card, border: `1px solid ${border}` }}
+                        title="Editar hallazgo" aria-label="Editar hallazgo"
+                      >
+                        <Pencil size={12} style={{ color: sub }} />
+                      </button>
+                      <button
+                        onClick={() => setConfirmEliminarHallazgo(h.id)}
+                        className="p-1.5 rounded-lg hover:opacity-70 transition"
+                        style={{ backgroundColor: card, border: `1px solid ${border}` }}
+                        title="Eliminar hallazgo" aria-label="Eliminar hallazgo"
+                      >
+                        <Trash2 size={12} style={{ color: '#EF4444' }} />
+                      </button>
+                    </div>
                   </div>
                   {h.recomendacion && (
                     <p className="flex items-center gap-1 text-xs" style={{ color: sub }}>
                     <Lightbulb className="w-3 h-3 shrink-0" />{h.recomendacion}
                   </p>
                   )}
+                  </>
+                  )}
 
                   {/* NCs existentes del hallazgo */}
-                  {h.no_conformidades?.length > 0 && (
+                  {editingHallazgoId !== h.id && h.no_conformidades?.length > 0 && (
                     <div className="mt-2 space-y-2 pl-2 border-l-2" style={{ borderColor: '#6366F1' }}>
                       {h.no_conformidades.map(nc => (
                         <div key={nc.id} className="rounded-lg p-3"
                              style={{ backgroundColor: card, border: `1px solid ${border}` }}>
                           {editingNcId === nc.id ? (
                             <div className="space-y-2">
-                              <select value={editNcForm.estado}
-                                      onChange={e => setEditNcForm(f => ({ ...f, estado: e.target.value }))}
-                                      className="w-full rounded-lg px-3 py-1.5 text-xs outline-none"
-                                      style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }}>
-                                <option value="">Estado...</option>
-                                <option value="abierta">Abierta</option>
-                                <option value="en_proceso">En proceso</option>
-                                <option value="cerrada">Cerrada</option>
-                              </select>
+                              <textarea rows={2} placeholder="Descripción de la NC..."
+                                        value={editNcForm.descripcion}
+                                        onChange={e => setEditNcForm(f => ({ ...f, descripcion: e.target.value }))}
+                                        className="w-full rounded-lg px-3 py-1.5 text-xs outline-none resize-none"
+                                        style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }} />
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-xs mb-0.5 block" style={{ color: sub }}>Fecha límite</label>
+                                  <input type="date" value={editNcForm.fecha_limite}
+                                         onChange={e => setEditNcForm(f => ({ ...f, fecha_limite: e.target.value }))}
+                                         className="w-full rounded-lg px-2 py-1.5 text-xs outline-none"
+                                         style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }} />
+                                </div>
+                                <div>
+                                  <label className="text-xs mb-0.5 block" style={{ color: sub }}>Estado</label>
+                                  <select value={editNcForm.estado}
+                                          onChange={e => setEditNcForm(f => ({ ...f, estado: e.target.value }))}
+                                          className="w-full rounded-lg px-2 py-1.5 text-xs outline-none"
+                                          style={{ backgroundColor: input, color: text, border: `1px solid ${border}` }}>
+                                    <option value="">Sin cambio</option>
+                                    <option value="abierta">Abierta</option>
+                                    <option value="en_proceso">En proceso</option>
+                                    <option value="cerrada">Cerrada</option>
+                                  </select>
+                                </div>
+                              </div>
                               <input type="text" placeholder="Evidencia de cierre (opcional)"
                                      value={editNcForm.evidencia_cierre}
                                      onChange={e => setEditNcForm(f => ({ ...f, evidencia_cierre: e.target.value }))}
@@ -392,7 +579,7 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
                                 )}
                               </div>
                               <button
-                                onClick={() => { setEditingNcId(nc.id); setEditNcForm({ estado: nc.estado || '', evidencia_cierre: nc.evidencia_cierre || '' }) }}
+                                onClick={() => { setEditingNcId(nc.id); setEditNcForm({ estado: nc.estado || '', evidencia_cierre: nc.evidencia_cierre || '', descripcion: nc.descripcion || '', fecha_limite: nc.fecha_limite ? nc.fecha_limite.split('T')[0] : '' }) }}
                                 className="p-1.5 rounded-lg shrink-0 hover:opacity-70 transition"
                                 style={{ backgroundColor: card, border: `1px solid ${border}` }}
                                 title="Editar NC"
@@ -406,7 +593,7 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
                     </div>
                   )}
 
-                  {(h.clasificacion === 'no_conformidad_menor' || h.clasificacion === 'no_conformidad_mayor') && (
+                  {editingHallazgoId !== h.id && (h.clasificacion === 'no_conformidad_menor' || h.clasificacion === 'no_conformidad_mayor') && (
                     ncTarget === h.id ? (
                       <div className="rounded-xl p-3 space-y-2 border-2 mt-1" style={{ borderColor: '#6366F1', backgroundColor: card }}>
                         <p className="text-xs font-semibold" style={{ color: text }}>Nueva No Conformidad</p>
@@ -472,6 +659,31 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmCompletar}
+        title="¿Marcar auditoría como completada?"
+        message={
+          ncsAbiertas > 0
+            ? `Hay ${ncsAbiertas} no conformidad${ncsAbiertas === 1 ? '' : 'es'} abierta${ncsAbiertas === 1 ? '' : 's'}. ¿Marcar como completada de todas formas?`
+            : 'Esta acción documenta el cierre del ciclo de auditoría. ¿Deseas continuar?'
+        }
+        confirmLabel="Marcar como completada"
+        danger={ncsAbiertas > 0}
+        onConfirm={() => { setConfirmCompletar(false); ejecutarCambioEstado('completada') }}
+        onCancel={() => setConfirmCompletar(false)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmEliminarHallazgo}
+        title="¿Eliminar hallazgo?"
+        message="Esta acción eliminará el hallazgo y sus no conformidades asociadas. No se puede deshacer."
+        confirmLabel="Eliminar"
+        danger
+        loading={loading}
+        onConfirm={() => eliminarHallazgo(confirmEliminarHallazgo)}
+        onCancel={() => setConfirmEliminarHallazgo(null)}
+      />
     </div>
   )
 }
@@ -480,14 +692,15 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
    PÁGINA PRINCIPAL
 ══════════════════════════════════════════ */
 export default function Auditorias() {
-  const { darkMode } = useOutletContext()
+  const { darkMode } = useTheme()
   const bg     = darkMode ? '#0B0F19' : '#F9FAFB'
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
 
   const [auditorias, setAuditorias]     = useState([])
+  const [progresos, setProgresos]       = useState({})
   const [filtro, setFiltro]             = useState('todas')
   const [loading, setLoading]           = useState(true)
   const [modalNuevo, setModalNuevo]     = useState(false)
@@ -498,8 +711,19 @@ export default function Auditorias() {
   const cargar = () => {
     setLoading(true)
     auditoriasAPI.getAll()
-      .then(r => setAuditorias(r.data))
-      .catch(console.error)
+      .then(async r => {
+        const lista = r.data
+        setAuditorias(lista)
+        const resultados = await Promise.allSettled(
+          lista.map(a => auditoriasAPI.getProgreso(a.id))
+        )
+        const map = {}
+        resultados.forEach((res, i) => {
+          if (res.status === 'fulfilled') map[lista[i].id] = res.value.data
+        })
+        setProgresos(map)
+      })
+      .catch(() => {})
       .finally(() => setLoading(false))
   }
 
@@ -520,6 +744,8 @@ export default function Auditorias() {
   const auditoriasFiltradas = filtro === 'todas'
     ? auditorias
     : auditorias.filter(a => a.estado === filtro)
+
+  const { paginaItems: auditoriasPagina, pagina, totalPaginas, setPagina } = usePaginacion(auditoriasFiltradas)
 
   return (
     <div className="min-h-full px-4 sm:px-6 lg:px-8 py-6" style={{ backgroundColor: bg }}>
@@ -563,8 +789,9 @@ export default function Auditorias() {
           <p className="text-sm" style={{ color: sub }}>No hay auditorías en este estado.</p>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {auditoriasFiltradas.map(a => (
+          {auditoriasPagina.map(a => (
             <div key={a.id} className="rounded-xl p-5 flex flex-col gap-3"
                  style={{ backgroundColor: card, border: `1px solid ${border}` }}>
               <div className="flex items-start justify-between gap-2">
@@ -577,14 +804,40 @@ export default function Auditorias() {
               {a.objetivos && (
                 <p className="text-xs leading-relaxed line-clamp-2" style={{ color: sub }}>{a.objetivos}</p>
               )}
-              <button onClick={() => setModalDetalle(a)}
-                      className="text-xs font-semibold hover:underline text-left mt-auto"
-                      style={{ color: '#6366F1' }}>
-                Ver detalle →
-              </button>
+              {progresos[a.id] && progresos[a.id].total > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs" style={{ color: sub }}>
+                      NCs: {progresos[a.id].completadas}/{progresos[a.id].total} cerradas
+                    </span>
+                    {(a.nc_abiertas ?? 0) > 0 && (
+                      <span className="text-xs font-semibold" style={{ color: '#EF4444' }}>
+                        {a.nc_abiertas} abierta{a.nc_abiertas === 1 ? '' : 's'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden"
+                       style={{ backgroundColor: darkMode ? '#374151' : '#E5E7EB' }}>
+                    <div className="h-full rounded-full transition-all"
+                         style={{
+                           width: `${progresos[a.id].porcentaje || 0}%`,
+                           backgroundColor: progresos[a.id].porcentaje === 100 ? '#22C55E' : '#6366F1',
+                         }} />
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end mt-auto pt-1">
+                <button onClick={() => setModalDetalle(a)}
+                        className="text-xs font-semibold rounded-lg px-3 py-1.5 transition hover:opacity-90"
+                        style={{ backgroundColor: '#6366F1', color: '#FFFFFF' }}>
+                  Ver detalle →
+                </button>
+              </div>
             </div>
           ))}
         </div>
+        <Paginador pagina={pagina} totalPaginas={totalPaginas} onCambiar={setPagina} darkMode={darkMode} />
+        </>
       )}
 
       {modalNuevo && (

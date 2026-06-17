@@ -5,10 +5,47 @@ import { useAuth } from '../../../context/AuthContext'
 import { useTheme } from '../../../context/ThemeContext'
 import {
   MessageSquare, Shield, Search, Moon, Sun,
-  ChevronDown, LogOut, User, Circle, Settings, Bell, GraduationCap
+  ChevronDown, ChevronLeft, ChevronRight, LogOut, User, Circle, Bell, GraduationCap, X, Menu
 } from 'lucide-react'
 import pisstLogo from '../../../assets/imagenes/pisst_logo.png'
+import logoMini from '../../../assets/imagenes/sincasco-removebg-preview.png'
 import { notificacionesAPI } from '../../../services/api'
+
+const NOTIF_LABELS = {
+  // incidente
+  abierto: 'Abierto', en_proceso: 'En proceso', cerrado: 'Cerrado', investigacion: 'En investigación',
+  // NC
+  abierta: 'Abierta', cerrada: 'Cerrada',
+  // auditoría
+  planificada: 'Planificada', en_ejecucion: 'En ejecución', completada: 'Completada',
+  // riesgo
+  bajo: 'Bajo', medio: 'Medio', alto: 'Alto', critico: 'Crítico',
+  // capacitación
+  pendiente: 'Pendiente', realizada: 'Realizada', cancelada: 'Cancelada', no_realizada: 'No realizada',
+  programada: 'Programada',
+  // genéricos
+  activo: 'Activo', inactivo: 'Inactivo', aprobado: 'Aprobado', rechazado: 'Rechazado',
+  presente: 'Presente', ausente: 'Ausente', justificado: 'Justificado',
+}
+
+function sanitizarNotif(texto) {
+  if (!texto) return ''
+  // Reemplaza patrones tipo "modulo.enum.valor" o "modulo.valor" con la etiqueta legible
+  return texto.replace(/[a-z][a-z_]*(?:\.[a-z][a-z_]*)+/g, match => {
+    const key = match.split('.').pop()
+    return NOTIF_LABELS[key] ?? match
+  })
+}
+
+/* Destinos disponibles para la barra de búsqueda del header */
+const SEARCH_DESTINOS = [
+  { label: 'SASBOT — Asistente virtual', path: '/empleado/chat',          keywords: 'chat sasbot asistente ia bot conversacion' },
+  { label: 'Hacer reporte de incidente',  path: '/empleado/reporte',       keywords: 'reporte incidente nuevo accidente reportar' },
+  { label: 'Mis reportes',                path: '/empleado/reporte',       keywords: 'mis reportes estado incidentes enviados' },
+  { label: 'Mis capacitaciones',          path: '/empleado/capacitaciones', keywords: 'capacitaciones cursos evaluacion certificado' },
+  { label: 'Mi perfil',                   path: '/empleado/perfil',        keywords: 'perfil foto datos personales' },
+  { label: 'Cambiar contraseña',          path: '/empleado/perfil',        keywords: 'contraseña password seguridad cambiar' },
+]
 
 export const TemaContext = createContext({ dark: true, setDark: () => {} })
 export const useTema = () => useContext(TemaContext)
@@ -17,6 +54,13 @@ const NAV = [
   { icon: MessageSquare,  label: 'SASBOT',          path: '/empleado/chat'           },
   { icon: Shield,         label: 'Hacer Reporte',   path: '/empleado/reporte'        },
   { icon: GraduationCap,  label: 'Capacitaciones',  path: '/empleado/capacitaciones' },
+]
+
+// Incluye "Perfil" para dar acceso directo en el nav inferior móvil
+// (en escritorio el perfil ya es accesible desde el chip de usuario).
+const NAV_MOBILE = [
+  ...NAV,
+  { icon: User, label: 'Perfil', path: '/empleado/perfil' },
 ]
 
 const T = {
@@ -61,8 +105,14 @@ export default function EmpleadoLayout() {
   const [notifAbiertas, setNotif]     = useState(false)
   const [notificaciones, setNotifs]   = useState([])
   const [noLeidas, setNoLeidas]       = useState(0)
-  const menuRef                       = useRef(null)
-  const notifRef                      = useRef(null)
+  const [colapsado, setColapsado]     = useState(false)
+  const [drawerAbierto, setDrawer]    = useState(false)
+  const [busqueda, setBusqueda]       = useState('')
+  const [busquedaAbierta, setBusquedaAbierta] = useState(false)
+  const [notifPos, setNotifPos]        = useState({ top: 0, right: 8, width: 320 })
+  const menuRef                        = useRef(null)
+  const notifRef                       = useRef(null)
+  const busquedaRef                    = useRef(null)
 
   const dark    = darkMode
   const tk      = dark ? T.dark : T.light
@@ -88,6 +138,29 @@ export default function EmpleadoLayout() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  // Cerrar resultados de búsqueda al click fuera
+  useEffect(() => {
+    const handler = (e) => {
+      if (busquedaRef.current && !busquedaRef.current.contains(e.target)) setBusquedaAbierta(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Resultados de la búsqueda en el header
+  const resultadosBusqueda = busqueda.trim()
+    ? SEARCH_DESTINOS.filter(d => {
+        const q = busqueda.trim().toLowerCase()
+        return d.label.toLowerCase().includes(q) || d.keywords.includes(q)
+      })
+    : SEARCH_DESTINOS
+
+  const irABusqueda = (path) => {
+    navigate(path)
+    setBusqueda('')
+    setBusquedaAbierta(false)
+  }
 
   // Cargar notificaciones — defensivo contra cualquier forma del response
   const cargarNotifs = () => {
@@ -127,40 +200,84 @@ export default function EmpleadoLayout() {
       }).catch(() => {})
   }
 
+  const abrirNotif = () => {
+    if (!notifAbiertas && notifRef.current) {
+      const rect = notifRef.current.getBoundingClientRect()
+      const vw = window.innerWidth
+      const panelW = Math.min(320, vw - 16)
+      const naturalRight = vw - rect.right
+      const right = Math.max(8, Math.min(naturalRight, vw - panelW - 8))
+      setNotifPos({ top: rect.bottom + 8, right, width: panelW })
+    }
+    setNotif(p => !p)
+  }
+
   const MENU_ITEMS = [
     { icon: User,    label: 'Perfil',         action: () => { navigate('/empleado/perfil'); setMenu(false) } },
-    { icon: Settings,label: 'Configuración',  action: () => { setMenu(false) } },
     { separador: true },
     { icon: LogOut,  label: 'Cerrar sesión',  action: handleLogout, danger: true },
   ]
 
   return (
     <TemaContext.Provider value={{ dark, setDark: setDarkMode, tk }}>
-      <div style={{
-        display: 'flex', minHeight: '100vh',
+      <style>{`
+        .empleado-shell { height: 100vh; height: 100dvh; }
+        .empleado-sidebar { display: flex; }
+        .empleado-mobile-nav { display: none; }
+        .empleado-hamburger { display: none; }
+        @media (max-width: 1024px) {
+          .empleado-sidebar { display: none; }
+          .empleado-mobile-nav { display: flex; }
+          .empleado-hamburger { display: flex; }
+        }
+        @media (max-width: 640px) {
+          .empleado-header-search { display: none; }
+          .empleado-chat-header-extra { display: none; }
+          .empleado-theme-label { display: none; }
+          .empleado-userchip-info { display: none; }
+          .empleado-form-grid, .empleado-form-grid-3 { grid-template-columns: 1fr !important; }
+          .empleado-perfil-layout { flex-direction: column !important; }
+          .empleado-perfil-tabs { width: 100% !important; flex-direction: row !important; overflow-x: auto; }
+        }
+        @media (max-height: 480px) {
+          .empleado-chat-suggestions, .empleado-chat-disclaimer { display: none; }
+        }
+        @keyframes slideInLeft {
+          from { transform: translateX(-100%); }
+          to   { transform: translateX(0); }
+        }
+      `}</style>
+      <div className="empleado-shell" style={{
+        display: 'flex',
         backgroundColor: tk.bg,
         fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif",
         color: tk.text, transition: 'background-color 0.2s, color 0.2s'
       }}>
 
         {/* ── SIDEBAR ── */}
-        <aside style={{
-          width: 200, flexShrink: 0,
+        <aside className="empleado-sidebar" style={{
+          width: colapsado ? 72 : 200, flexShrink: 0,
           backgroundColor: tk.sidebar, borderRight: `1px solid ${tk.border}`,
-          display: 'flex', flexDirection: 'column', padding: '20px 0',
-          transition: 'background-color 0.2s, border-color 0.2s'
+          flexDirection: 'column', padding: '20px 0',
+          transition: 'width 0.2s, background-color 0.2s, border-color 0.2s'
         }}>
-          <div style={{ padding: '0 20px 24px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src={pisstLogo} alt="PISST"
-              style={{ height: 100, width: 'auto', objectFit: 'contain', display: 'block' }} />
+          <div style={{
+            padding: colapsado ? '0 0 24px' : '0 20px 24px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10
+          }}>
+            {colapsado
+              ? <img src={logoMini} alt="PISST" style={{ height: 40, width: 40, objectFit: 'contain', display: 'block' }} />
+              : <img src={pisstLogo} alt="PISST" style={{ height: 100, width: 'auto', objectFit: 'contain', display: 'block' }} />
+            }
           </div>
 
           <nav style={{ flex: 1, padding: '0 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {NAV.map(({ icon: Icon, label, path }) => {
               const active = location.pathname === path
               return (
-                <button key={path} onClick={() => navigate(path)} style={{
+                <button key={path} onClick={() => navigate(path)} title={colapsado ? label : undefined} style={{
                   display: 'flex', alignItems: 'center', gap: 12,
+                  justifyContent: colapsado ? 'center' : 'flex-start',
                   padding: '10px 14px', borderRadius: 10, border: 'none',
                   cursor: 'pointer', width: '100%', textAlign: 'left',
                   fontSize: 14, fontWeight: active ? 600 : 400,
@@ -171,44 +288,149 @@ export default function EmpleadoLayout() {
                   onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = tk.navHover }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}
                 >
-                  <Icon size={17} /> {label}
+                  <Icon size={17} /> {!colapsado && label}
                 </button>
               )
             })}
           </nav>
 
           <div style={{
-            margin: '0 10px', padding: '12px 14px', borderRadius: 12,
+            margin: '0 10px', padding: colapsado ? '12px 8px' : '12px 14px', borderRadius: 12,
             backgroundColor: tk.card, border: `1px solid ${tk.border}`,
             transition: 'background-color 0.2s'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: colapsado ? 'center' : 'flex-start' }}>
               <div style={{ position: 'relative' }}>
                 <div style={{
-                  width: 36, height: 36, borderRadius: '50%',
+                  width: 36, height: 36, borderRadius: '50%', overflow: 'hidden',
                   background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, fontWeight: 700, color: '#fff'
-                }}>{inicial}</div>
+                  fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0
+                }}>
+                  {user?.foto_url
+                    ? <img src={user.foto_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : inicial}
+                </div>
                 <div style={{
                   position: 'absolute', bottom: 1, right: 1,
                   width: 9, height: 9, borderRadius: '50%',
                   backgroundColor: '#22C55E', border: `2px solid ${tk.card}`
                 }} />
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: 13, fontWeight: 600, color: tk.text,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                }}>{nombre}</div>
-                <div style={{ fontSize: 11, color: tk.textFaint }}>Empleado</div>
+              {!colapsado && (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 13, fontWeight: 600, color: tk.text,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                  }}>{nombre}</div>
+                  <div style={{ fontSize: 11, color: tk.textFaint }}>Empleado</div>
+                </div>
+              )}
+            </div>
+            {!colapsado && (
+              <div style={{ marginTop: 8, fontSize: 11, color: '#22C55E', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Circle size={7} fill="#22C55E" /> En línea
+              </div>
+            )}
+          </div>
+
+          {/* Botón colapsar — solo escritorio (el sidebar se oculta en móvil) */}
+          <button
+            onClick={() => setColapsado(v => !v)}
+            title={colapsado ? 'Expandir menú' : 'Colapsar menú'}
+            style={{
+              margin: '10px 10px 0', display: 'flex', alignItems: 'center',
+              justifyContent: colapsado ? 'center' : 'flex-start', gap: 8,
+              padding: '9px 14px', borderRadius: 10, border: `1px solid ${tk.border}`,
+              backgroundColor: 'transparent', color: tk.textFaint,
+              fontSize: 12, cursor: 'pointer', transition: 'all 0.15s'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = tk.navHover }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
+          >
+            {colapsado ? <ChevronRight size={15} /> : <><ChevronLeft size={15} /> Colapsar menú</>}
+          </button>
+        </aside>
+
+        {/* ── DRAWER (menú hamburguesa, tablet/móvil) ── */}
+        {drawerAbierto && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex' }}>
+            <div
+              onClick={() => setDrawer(false)}
+              style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)' }}
+            />
+            <div style={{
+              position: 'relative', width: 240, maxWidth: '80vw', height: '100%',
+              backgroundColor: tk.sidebar, borderRight: `1px solid ${tk.border}`,
+              display: 'flex', flexDirection: 'column', padding: '20px 0',
+              animation: 'slideInLeft 0.2s ease', overflowY: 'auto'
+            }}>
+              <div style={{
+                padding: '0 16px 20px', display: 'flex',
+                alignItems: 'center', justifyContent: 'space-between'
+              }}>
+                <img src={pisstLogo} alt="PISST" style={{ height: 60, objectFit: 'contain' }} />
+                <button onClick={() => setDrawer(false)} style={{
+                  width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'none', border: `1px solid ${tk.border}`, borderRadius: 8,
+                  color: tk.textMuted, cursor: 'pointer'
+                }}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <nav style={{ flex: 1, padding: '0 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {NAV.map(({ icon: Icon, label, path }) => {
+                  const active = location.pathname === path
+                  return (
+                    <button key={path} onClick={() => { navigate(path); setDrawer(false) }} style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '10px 14px', borderRadius: 10, border: 'none',
+                      cursor: 'pointer', width: '100%', textAlign: 'left',
+                      fontSize: 14, fontWeight: active ? 600 : 400,
+                      backgroundColor: active ? tk.navActive : 'transparent',
+                      color: active ? tk.navColor : tk.textMuted
+                    }}>
+                      <Icon size={17} /> {label}
+                    </button>
+                  )
+                })}
+              </nav>
+
+              <div style={{
+                margin: '0 10px', padding: '12px 14px', borderRadius: 12,
+                backgroundColor: tk.card, border: `1px solid ${tk.border}`
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: '50%', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0
+                    }}>
+                      {user?.foto_url
+                        ? <img src={user.foto_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : inicial}
+                    </div>
+                    <div style={{
+                      position: 'absolute', bottom: 1, right: 1,
+                      width: 9, height: 9, borderRadius: '50%',
+                      backgroundColor: '#22C55E', border: `2px solid ${tk.card}`
+                    }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 13, fontWeight: 600, color: tk.text,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                    }}>{nombre}</div>
+                    <div style={{ fontSize: 11, color: tk.textFaint }}>Empleado</div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div style={{ marginTop: 8, fontSize: 11, color: '#22C55E', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Circle size={7} fill="#22C55E" /> En línea
-            </div>
           </div>
-        </aside>
+        )}
 
         {/* ── MAIN ── */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -222,19 +444,72 @@ export default function EmpleadoLayout() {
             transition: 'background-color 0.2s, border-color 0.2s',
             position: 'relative', zIndex: 50
           }}>
-            <div style={{
-              flex: 1, maxWidth: 440,
-              display: 'flex', alignItems: 'center', gap: 10,
-              backgroundColor: tk.searchBg, border: `1px solid ${tk.border}`,
-              borderRadius: 10, padding: '8px 14px'
-            }}>
-              <Search size={15} color={tk.textFaint} />
-              <span style={{ fontSize: 13, color: tk.textFaint }}>Buscar en PISST...</span>
-              <span style={{
-                marginLeft: 'auto', fontSize: 11, color: tk.textFaint,
-                backgroundColor: tk.sidebar, padding: '2px 6px', borderRadius: 5,
-                border: `1px solid ${tk.border}`
-              }}>Ctrl + K</span>
+            <button
+              className="empleado-hamburger"
+              onClick={() => setDrawer(true)}
+              aria-label="Abrir menú"
+              style={{
+                width: 36, height: 36, borderRadius: 9, border: `1px solid ${tk.border}`,
+                backgroundColor: tk.card, color: tk.textMuted,
+                alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', flexShrink: 0
+              }}
+            >
+              <Menu size={17} />
+            </button>
+
+            <div ref={busquedaRef} className="empleado-header-search" style={{ flex: 1, maxWidth: 440, position: 'relative' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                backgroundColor: tk.searchBg, border: `1px solid ${busquedaAbierta ? '#6366F1' : tk.border}`,
+                borderRadius: 10, padding: '8px 14px'
+              }}>
+                <Search size={15} color={tk.textFaint} />
+                <input
+                  type="text"
+                  value={busqueda}
+                  onFocus={() => setBusquedaAbierta(true)}
+                  onChange={e => { setBusqueda(e.target.value); setBusquedaAbierta(true) }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && resultadosBusqueda[0]) irABusqueda(resultadosBusqueda[0].path)
+                    if (e.key === 'Escape') setBusquedaAbierta(false)
+                  }}
+                  placeholder="Buscar en PISST..."
+                  style={{
+                    flex: 1, minWidth: 0, border: 'none', outline: 'none',
+                    backgroundColor: 'transparent', color: tk.text, fontSize: 13, fontFamily: 'inherit'
+                  }}
+                />
+                {busqueda && (
+                  <X size={14} color={tk.textFaint} style={{ cursor: 'pointer' }} onClick={() => setBusqueda('')} />
+                )}
+              </div>
+
+              {busquedaAbierta && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+                  backgroundColor: tk.dropdownBg, border: `1px solid ${tk.border}`,
+                  borderRadius: 12, boxShadow: '0 16px 40px rgba(0,0,0,0.35)',
+                  overflow: 'hidden', zIndex: 100, maxHeight: 280, overflowY: 'auto'
+                }}>
+                  {resultadosBusqueda.length === 0 ? (
+                    <div style={{ padding: '14px 16px', fontSize: 13, color: tk.textFaint, textAlign: 'center' }}>
+                      Sin resultados para "{busqueda}"
+                    </div>
+                  ) : resultadosBusqueda.map(d => (
+                    <button key={d.label} onClick={() => irABusqueda(d.path)} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                      padding: '10px 14px', border: 'none', backgroundColor: 'transparent',
+                      color: tk.text, fontSize: 13, textAlign: 'left', cursor: 'pointer'
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = tk.navHover}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <Search size={13} color={tk.textFaint} /> {d.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -256,14 +531,14 @@ export default function EmpleadoLayout() {
                     backgroundColor: dark === val ? tk.toggleActive : 'transparent',
                     color: dark === val ? tk.text : tk.textFaint, transition: 'all 0.15s'
                   }}>
-                    <Icon size={13} /> {label}
+                    <Icon size={13} /> <span className="empleado-theme-label">{label}</span>
                   </button>
                 ))}
               </div>
 
               {/* ── Campana notificaciones ── */}
               <div ref={notifRef} style={{ position: 'relative' }}>
-                <button onClick={() => setNotif(p => !p)} style={{
+                <button onClick={abrirNotif} style={{
                   position: 'relative', width: 36, height: 36,
                   borderRadius: 9, border: `1px solid ${notifAbiertas ? '#6366F1' : tk.border}`,
                   backgroundColor: notifAbiertas ? 'rgba(99,102,241,0.1)' : tk.card,
@@ -285,11 +560,11 @@ export default function EmpleadoLayout() {
 
                 {notifAbiertas && (
                   <div style={{
-                    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-                    width: 320, maxHeight: 420, overflowY: 'auto',
+                    position: 'fixed', top: notifPos.top, right: notifPos.right,
+                    width: notifPos.width, maxHeight: 420, overflowY: 'auto',
                     backgroundColor: tk.dropdownBg, border: `1px solid ${tk.border}`,
                     borderRadius: 14, boxShadow: '0 16px 40px rgba(0,0,0,0.35)',
-                    zIndex: 100, animation: 'fadeDown 0.15s ease'
+                    zIndex: 9999, animation: 'fadeDown 0.15s ease'
                   }}>
                     <div style={{
                       padding: '12px 16px', borderBottom: `1px solid ${tk.border}`,
@@ -330,9 +605,9 @@ export default function EmpleadoLayout() {
                         }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: n.leido ? 400 : 600, color: tk.text, marginBottom: 2 }}>
-                            {n.titulo}
+                            {sanitizarNotif(n.titulo)}
                           </div>
-                          <div style={{ fontSize: 12, color: tk.textFaint, lineHeight: 1.4 }}>{n.descripcion}</div>
+                          <div style={{ fontSize: 12, color: tk.textFaint, lineHeight: 1.4 }}>{sanitizarNotif(n.descripcion)}</div>
                           <div style={{ fontSize: 11, color: tk.textFaint, marginTop: 4 }}>
                             {n.fecha ? new Date(n.fecha + 'Z').toLocaleString('es-CO', {
                               day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
@@ -357,16 +632,20 @@ export default function EmpleadoLayout() {
                   transition: 'all 0.15s', userSelect: 'none'
                 }}>
                   <div style={{
-                    width: 28, height: 28, borderRadius: '50%',
+                    width: 28, height: 28, borderRadius: '50%', overflow: 'hidden',
                     background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 12, fontWeight: 700, color: '#fff'
-                  }}>{inicial}</div>
-                  <div>
+                    fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0
+                  }}>
+                    {user?.foto_url
+                      ? <img src={user.foto_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : inicial}
+                  </div>
+                  <div className="empleado-userchip-info">
                     <div style={{ fontSize: 13, fontWeight: 600, color: tk.text, lineHeight: 1.2 }}>{nombre}</div>
                     <div style={{ fontSize: 11, color: tk.textFaint }}>Empleado</div>
                   </div>
-                  <ChevronDown size={14} color={tk.textFaint} style={{
+                  <ChevronDown size={14} color={tk.textFaint} className="empleado-userchip-info" style={{
                     transition: 'transform 0.2s',
                     transform: menuAbierto ? 'rotate(180deg)' : 'rotate(0deg)'
                   }} />
@@ -419,11 +698,37 @@ export default function EmpleadoLayout() {
           </header>
 
           <main style={{
-            flex: 1, overflow: 'auto',
+            flex: 1, overflow: 'auto', overflowX: 'hidden', minHeight: 0,
+            scrollbarGutter: 'stable',
+            display: 'flex', flexDirection: 'column',
             backgroundColor: tk.bg, transition: 'background-color 0.2s'
           }}>
             <Outlet />
           </main>
+
+          {/* ── NAV INFERIOR (móvil) ── */}
+          <nav className="empleado-mobile-nav" style={{
+            flexShrink: 0, borderTop: `1px solid ${tk.border}`,
+            backgroundColor: tk.sidebar, padding: '6px 4px',
+            justifyContent: 'space-around', alignItems: 'center',
+            transition: 'background-color 0.2s, border-color 0.2s'
+          }}>
+            {NAV_MOBILE.map(({ icon: Icon, label, path }) => {
+              const active = location.pathname === path
+              return (
+                <button key={path} onClick={() => navigate(path)} style={{
+                  flex: 1, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', gap: 2,
+                  padding: '6px 4px', borderRadius: 8, border: 'none',
+                  backgroundColor: active ? tk.navActive : 'transparent',
+                  color: active ? tk.navColor : tk.textMuted,
+                  fontSize: 11, fontWeight: active ? 600 : 400, cursor: 'pointer'
+                }}>
+                  <Icon size={18} /> {label}
+                </button>
+              )
+            })}
+          </nav>
         </div>
       </div>
     </TemaContext.Provider>

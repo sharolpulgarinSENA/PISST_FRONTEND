@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useTheme } from '../../../context/ThemeContext'
 import {
   User, Camera, Mail, Briefcase, Lock, Eye, EyeOff, Check, X, Loader2, History,
 } from 'lucide-react'
-import { usuariosAPI, authAPI } from '../../../services/api'
+import { usuariosAPI, authAPI, getErrorMessage } from '../../../services/api'
+import { normFecha, fmtFecha } from '../../../utils/dates'
 import { useAuth } from '../../../context/AuthContext'
 
 const REQUISITOS = [
@@ -16,22 +17,24 @@ const FOTO_FORMATOS = ['image/jpeg', 'image/png', 'image/webp']
 const FOTO_MAX_BYTES = 2 * 1024 * 1024
 const ACTIVIDAD_LIMIT = 10
 
-function normFecha(f) {
-  if (!f) return ''
-  return f.endsWith('Z') || f.includes('+') || /[+-]\d{2}:\d{2}$/.test(f) ? f : f + 'Z'
-}
+const ERRORES_TECNICOS = [
+  [/value is not a valid email/i,              'El correo electrónico no es válido.'],
+  [/string too short/i,                        'El texto ingresado es demasiado corto.'],
+  [/string too long/i,                         'El texto ingresado es demasiado largo.'],
+  [/value is not a valid integer/i,            'Debes ingresar un número entero.'],
+  [/none is not an allowed value/i,            'Este campo es obligatorio.'],
+  [/field required/i,                          'Este campo es obligatorio.'],
+  [/ensure this value has at least/i,          'El valor no cumple el mínimo requerido.'],
+  [/incorrect.*password|password.*incorrect/i, 'La contraseña actual es incorrecta.'],
+  [/not enough characters/i,                   'La contraseña es demasiado corta.'],
+]
 
-function fmtFecha(f) {
-  if (!f) return '—'
-  return new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(normFecha(f)))
-}
-
-function extraerDetalle(err) {
-  const detail = err.response?.data?.detail
-  if (!detail) return null
-  if (typeof detail === 'string') return detail
-  if (Array.isArray(detail)) return detail.map((d) => d.msg).filter(Boolean).join(' · ')
-  return null
+function sanitizarError(msg) {
+  if (!msg) return msg
+  for (const [pattern, replacement] of ERRORES_TECNICOS) {
+    if (pattern.test(msg)) return replacement
+  }
+  return msg
 }
 
 function iniciales(nombre) {
@@ -98,14 +101,14 @@ function Banner({ type, children }) {
    Componente principal
 ─────────────────────────────────────────── */
 export default function PerfilSST() {
-  const { darkMode } = useOutletContext()
+  const { darkMode } = useTheme()
   const { updateUser } = useAuth()
 
   const bg     = darkMode ? '#0B0F19' : '#F9FAFB'
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
   const [tab, setTab] = useState('info')
@@ -188,7 +191,7 @@ export default function PerfilSST() {
       updateUser({ nombre: data?.nombre ?? form.nombre.trim() })
       setInfoMsg({ type: 'ok', text: 'Cambios guardados correctamente.' })
     } catch (err) {
-      setInfoMsg({ type: 'error', text: extraerDetalle(err) || 'No se pudieron guardar los cambios.' })
+      setInfoMsg({ type: 'error', text: sanitizarError(getErrorMessage(err, null)) || 'No se pudieron guardar los cambios.' })
     } finally {
       setGuardando(false)
     }
@@ -230,7 +233,7 @@ export default function PerfilSST() {
       setFotoMsg({ type: 'ok', text: 'Foto actualizada correctamente.' })
       cancelarFoto()
     } catch (err) {
-      setFotoMsg({ type: 'error', text: extraerDetalle(err) || 'No se pudo actualizar la foto.' })
+      setFotoMsg({ type: 'error', text: sanitizarError(getErrorMessage(err, null)) || 'No se pudo actualizar la foto.' })
     } finally {
       setSubiendoFoto(false)
     }
@@ -258,7 +261,7 @@ export default function PerfilSST() {
       setPwMsg({ type: 'ok', text: 'Contraseña actualizada correctamente.' })
       setPwForm({ actual: '', nueva: '', confirmar: '' })
     } catch (err) {
-      setPwMsg({ type: 'error', text: extraerDetalle(err) || 'No se pudo cambiar la contraseña.' })
+      setPwMsg({ type: 'error', text: sanitizarError(getErrorMessage(err, null)) || 'No se pudo cambiar la contraseña.' })
     } finally {
       setPwLoading(false)
     }
@@ -471,6 +474,16 @@ export default function PerfilSST() {
               >
                 {pwLoading ? 'Guardando...' : 'Actualizar contraseña'}
               </button>
+
+              {!pwLoading && !pwValido && (
+                <p className="text-xs text-center mt-2" style={{ color: sub }}>
+                  {!pwForm.actual.length
+                    ? 'Ingresa tu contraseña actual para continuar.'
+                    : !pwCumple
+                      ? 'La nueva contraseña no cumple todos los requisitos.'
+                      : 'Las contraseñas nuevas no coinciden.'}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -491,7 +504,30 @@ export default function PerfilSST() {
           <p className="text-sm text-center py-6" style={{ color: sub }}>No hay actividad registrada.</p>
         ) : (
           <>
-            <div className="overflow-x-auto -mx-5 px-5">
+            {/* Mobile cards */}
+            <div className="sm:hidden space-y-3">
+              {actividad.map((reg, i) => (
+                <div key={reg.id ?? i} className="rounded-xl p-3 text-sm" style={{ backgroundColor: input, border: `1px solid ${border}` }}>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <span className="font-medium" style={{ color: text }}>
+                      {campoActividad(reg, ['accion', 'action', 'tipo_accion', 'evento']) || '—'}
+                    </span>
+                    <span className="text-xs whitespace-nowrap" style={{ color: sub }}>
+                      {fmtFecha(campoActividad(reg, ['fecha', 'created_at', 'fecha_hora', 'timestamp', 'fecha_evento']))}
+                    </span>
+                  </div>
+                  <div className="text-xs mb-0.5" style={{ color: sub }}>
+                    {campoActividad(reg, ['modulo', 'module']) || '—'}
+                  </div>
+                  <div className="text-xs" style={{ color: sub }}>
+                    {campoActividad(reg, ['detalle', 'descripcion', 'description', 'mensaje']) || '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto -mx-5 px-5">
               <table className="w-full text-sm" style={{ minWidth: 560 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${border}` }}>

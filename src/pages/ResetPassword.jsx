@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Check, X, Lock, Mail, MailCheck, ShieldCheck, ArrowLeft } from "lucide-react";
-import { authAPI } from "../services/api";
+import { authAPI, getErrorMessage } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 
 const REQUISITOS = [
@@ -9,14 +9,6 @@ const REQUISITOS = [
   { id: "mayuscula", label: "Al menos una mayúscula",                        test: (p) => /[A-Z]/.test(p) },
   { id: "simbolo",   label: 'Al menos un símbolo (!@#$%^&*(),.?":{}|<>_-)', test: (p) => /[!@#$%^&*(),.?":{}|<>_\-]/.test(p) },
 ];
-
-function extraerDetalle(err) {
-  const detail = err.response?.data?.detail;
-  if (!detail) return null;
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail)) return detail.map((d) => d.msg).filter(Boolean).join(" · ");
-  return null;
-}
 
 /* ──────────────────────────────────────────
    Subcomponentes FUERA de cualquier padre
@@ -119,7 +111,7 @@ function ModoSolicitar({ navigate, theme }) {
       await authAPI.forgotPassword({ email });
       setEnviado(true);
     } catch (err) {
-      setError(extraerDetalle(err) || "No pudimos procesar la solicitud. Inténtalo de nuevo.");
+      setError(getErrorMessage(err, null) || "No pudimos procesar la solicitud. Inténtalo de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -210,7 +202,7 @@ function ModoRestablecer({ navigate, token, theme }) {
       setOk(true);
       setTimeout(() => navigate("/login?reset=ok"), 1400);
     } catch (err) {
-      setError(extraerDetalle(err) || "El enlace no es válido o ha expirado. Solicita uno nuevo.");
+      setError(getErrorMessage(err, null) || "El enlace no es válido o ha expirado. Solicita uno nuevo.");
     } finally {
       setLoading(false);
     }
@@ -226,6 +218,9 @@ function ModoRestablecer({ navigate, token, theme }) {
         <p style={{ color: theme.sub, fontSize: 13.5, marginTop: 8 }}>
           Redirigiendo al inicio de sesión…
         </p>
+        <button onClick={() => navigate("/login")} style={linkBtn(theme.sub)}>
+          <ArrowLeft size={14} /> Ir al inicio de sesión
+        </button>
       </div>
     );
   }
@@ -286,6 +281,9 @@ function ModoRestablecer({ navigate, token, theme }) {
       <button onClick={restablecer} disabled={loading || !valido} style={primaryBtn(loading || !valido)}>
         {loading ? "Guardando…" : "Restablecer contraseña"}
       </button>
+      <button onClick={() => navigate("/login")} style={linkBtn(theme.sub)}>
+        <ArrowLeft size={14} /> Volver al inicio de sesión
+      </button>
     </>
   );
 }
@@ -305,7 +303,7 @@ export default function ResetPassword() {
     card:    dark ? "#111827" : "#FFFFFF",
     border:  dark ? "#1F2937" : "#E5E7EB",
     text:    dark ? "#F9FAFB" : "#0F172A",
-    sub:     dark ? "#9CA3AF" : "#64748B",
+    sub:     dark ? "#CBD5E1" : "#64748B",
     input:   dark ? "#1A1F33" : "#F8FAFC",
     inputBd: dark ? "#374151" : "#D1D5DB",
   };

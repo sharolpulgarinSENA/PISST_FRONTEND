@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useOutletContext } from 'react-router-dom'
-import { Plus, X, UserCheck, UserX, Pencil, Building2, Briefcase, ChevronDown, AlertTriangle } from 'lucide-react'
+import { useTheme } from '../../../context/ThemeContext'
+import { Plus, X, UserCheck, UserX, Pencil, Building2, Briefcase, ChevronDown, AlertTriangle, Power, PowerOff, Info, Search } from 'lucide-react'
 import { usuariosAPI, areasAPI, cargosAPI, getErrorMessage } from '../../../services/api'
+import { useModal } from '../../../hooks/useModal'
+import { usePaginacion } from '../../../hooks/usePaginacion'
+import Paginador from '../../../components/Paginador'
+import ConfirmDialog from '../../../components/ConfirmDialog'
 
 // SST solo puede crear empleados (backend bloquea sst/gerencia/admin con 403)
 const ROLES_CREAR = ['empleado']
@@ -13,6 +17,11 @@ const ROL_COLOR = {
 }
 const ROL_LABEL = {
   sst: 'Encargado SST', gerencia: 'Gerencia', empleado: 'Empleado'
+}
+const ROL_AVATAR_COLOR = {
+  sst:      '#6366F1',
+  gerencia: '#9333EA',
+  empleado: '#059669',
 }
 
 function Badge({ text, colorClass }) {
@@ -45,7 +54,7 @@ function useAreasYCargos() {
 function SelectDB({ value, onChange, items, placeholder, loading, darkMode, disabled }) {
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const border = darkMode ? '#374151' : '#E5E7EB'
 
   return (
@@ -78,10 +87,11 @@ function SelectDB({ value, onChange, items, placeholder, loading, darkMode, disa
    Solo GET + POST (sin editar/eliminar)
 ══════════════════════════════════════════ */
 function ModalGestionarOrg({ darkMode, onClose, onCambiado }) {
+  const dialogRef = useModal(onClose)
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
   const [tab, setTab]           = useState('areas')
@@ -147,15 +157,16 @@ function ModalGestionarOrg({ darkMode, onClose, onCambiado }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
-      <div className="w-full max-w-lg rounded-2xl shadow-2xl max-h-[85vh] flex flex-col"
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="modal-org-title"
+           className="w-full max-w-lg rounded-2xl shadow-2xl max-h-[85vh] flex flex-col"
            style={{ backgroundColor: card, border: `1px solid ${border}` }}>
 
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
           <div>
-            <h2 className="font-bold text-lg" style={{ color: text }}>Organización</h2>
+            <h2 id="modal-org-title" className="font-bold text-lg" style={{ color: text }}>Organización</h2>
             <p className="text-xs mt-0.5" style={{ color: sub }}>Gestiona áreas y cargos de la empresa</p>
           </div>
-          <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+          <button onClick={onClose} aria-label="Cerrar"><X size={18} style={{ color: sub }} /></button>
         </div>
 
         <div className="flex border-b px-6" style={{ borderColor: border }}>
@@ -171,9 +182,13 @@ function ModalGestionarOrg({ darkMode, onClose, onCambiado }) {
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {banner.msg && (
-            <div className={`text-sm rounded-lg px-4 py-3 border ${
-              banner.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'
-            }`}>{banner.msg}</div>
+            <div className="text-sm rounded-lg px-4 py-3"
+                 style={banner.type === 'ok'
+                   ? { backgroundColor: darkMode ? 'rgba(34,197,94,0.1)' : '#F0FDF4', border: `1px solid ${darkMode ? 'rgba(34,197,94,0.3)' : '#BBF7D0'}`, color: darkMode ? '#86EFAC' : '#15803D' }
+                   : { backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#FEF2F2', border: `1px solid ${darkMode ? 'rgba(239,68,68,0.3)' : '#FECACA'}`, color: darkMode ? '#FCA5A5' : '#B91C1C' }
+                 }>
+              {banner.msg}
+            </div>
           )}
 
           {/* ── Formulario crear área ── */}
@@ -293,10 +308,11 @@ function ModalGestionarOrg({ darkMode, onClose, onCambiado }) {
    MODAL: NUEVO USUARIO
 ══════════════════════════════════════════ */
 function ModalNuevoUsuario({ darkMode, areas, cargos, loadingOrg, onClose, onCreado }) {
+  const dialogRef = useModal(onClose)
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
   const [form, setForm]       = useState({ nombre: '', email: '', area_id: '', cargo_id: '', tipo_vinculacion: '' })
@@ -322,6 +338,7 @@ function ModalNuevoUsuario({ darkMode, areas, cargos, loadingOrg, onClose, onCre
     const e = {}
     if (!form.nombre) e.nombre = true
     if (!form.email)  e.email  = true
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'formato'
     setErrores(e)
     return Object.keys(e).length === 0
   }
@@ -358,31 +375,41 @@ function ModalNuevoUsuario({ darkMode, areas, cargos, loadingOrg, onClose, onCre
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
-      <div className="w-full max-w-md rounded-2xl shadow-2xl"
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="modal-nuevo-usuario-title"
+           className="w-full max-w-md rounded-2xl shadow-2xl"
            style={{ backgroundColor: card, border: `1px solid ${border}` }}>
 
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
-          <h2 className="font-bold text-lg" style={{ color: text }}>Nuevo Usuario</h2>
-          <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+          <h2 id="modal-nuevo-usuario-title" className="font-bold text-lg" style={{ color: text }}>Nuevo Usuario</h2>
+          <button onClick={onClose} aria-label="Cerrar"><X size={18} style={{ color: sub }} /></button>
         </div>
 
         <div className="px-6 py-5 space-y-4">
           {banner && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{banner}</div>
+            <div className="text-sm rounded-lg px-4 py-3"
+                 style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#FEF2F2', border: `1px solid ${darkMode ? 'rgba(239,68,68,0.3)' : '#FECACA'}`, color: darkMode ? '#FCA5A5' : '#B91C1C' }}>
+              {banner}
+            </div>
           )}
 
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Nombre completo *</label>
             <input type="text" placeholder="Nombre del usuario" value={form.nombre}
-                   onChange={e => set('nombre', e.target.value)}
+                   onChange={e => { set('nombre', e.target.value); setErrores(prev => ({ ...prev, nombre: false })) }}
                    className={inputCls('nombre')} style={{ backgroundColor: input, color: text }} />
           </div>
 
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: sub }}>Correo electrónico *</label>
             <input type="email" placeholder="correo@empresa.com" value={form.email}
-                   onChange={e => set('email', e.target.value)}
+                   onChange={e => { set('email', e.target.value); setErrores(prev => ({ ...prev, email: false })) }}
                    className={inputCls('email')} style={{ backgroundColor: input, color: text }} />
+            {errores.email === 'formato' && (
+              <p className="text-xs mt-1" style={{ color: '#EF4444' }}>Ingresa un correo electrónico válido.</p>
+            )}
+            {errores.email === true && (
+              <p className="text-xs mt-1" style={{ color: '#EF4444' }}>El correo electrónico es obligatorio.</p>
+            )}
           </div>
 
           <div>
@@ -425,8 +452,8 @@ function ModalNuevoUsuario({ darkMode, areas, cargos, loadingOrg, onClose, onCre
             </select>
           </div>
 
-          <div className="rounded-lg px-4 py-3 text-xs" style={{ backgroundColor: input, color: sub }}>
-            ℹ️ Se enviará una contraseña temporal al correo del usuario.
+          <div className="rounded-lg px-4 py-3 text-xs flex items-center gap-2" style={{ backgroundColor: input, color: sub }}>
+            <Info size={14} className="shrink-0" /> Se enviará una contraseña temporal al correo del usuario.
           </div>
         </div>
 
@@ -447,10 +474,11 @@ function ModalNuevoUsuario({ darkMode, areas, cargos, loadingOrg, onClose, onCre
    MODAL: EDITAR USUARIO
 ══════════════════════════════════════════ */
 function ModalEditarUsuario({ darkMode, usuario, areas, cargos, loadingOrg, onClose, onActualizado }) {
+  const dialogRef = useModal(onClose)
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
   const input  = darkMode ? '#1F2937' : '#F3F4F6'
 
   const areaInicial  = areas.find(a => a.nombre === usuario.area_nombre)?.id  ?? ''
@@ -495,17 +523,21 @@ function ModalEditarUsuario({ darkMode, usuario, areas, cargos, loadingOrg, onCl
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
-      <div className="w-full max-w-sm rounded-2xl shadow-2xl"
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="modal-editar-usuario-title"
+           className="w-full max-w-sm rounded-2xl shadow-2xl"
            style={{ backgroundColor: card, border: `1px solid ${border}` }}>
 
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: border }}>
-          <h2 className="font-bold text-lg" style={{ color: text }}>Editar Usuario</h2>
-          <button onClick={onClose}><X size={18} style={{ color: sub }} /></button>
+          <h2 id="modal-editar-usuario-title" className="font-bold text-lg" style={{ color: text }}>Editar Usuario</h2>
+          <button onClick={onClose} aria-label="Cerrar"><X size={18} style={{ color: sub }} /></button>
         </div>
 
         <div className="px-6 py-5 space-y-4">
           {banner && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{banner}</div>
+            <div className="text-sm rounded-lg px-4 py-3"
+                 style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#FEF2F2', border: `1px solid ${darkMode ? 'rgba(239,68,68,0.3)' : '#FECACA'}`, color: darkMode ? '#FCA5A5' : '#B91C1C' }}>
+              {banner}
+            </div>
           )}
 
           <div>
@@ -566,37 +598,80 @@ function ModalEditarUsuario({ darkMode, usuario, areas, cargos, loadingOrg, onCl
    PÁGINA PRINCIPAL
 ══════════════════════════════════════════ */
 export default function Usuarios() {
-  const { darkMode } = useOutletContext()
+  const { darkMode } = useTheme()
   const bg     = darkMode ? '#0B0F19' : '#F9FAFB'
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
-  const sub    = darkMode ? '#9CA3AF' : '#6B7280'
+  const sub    = darkMode ? '#CBD5E1' : '#6B7280'
 
   const [usuarios, setUsuarios]       = useState([])
   const [loading, setLoading]         = useState(true)
+  const [errorCarga, setErrorCarga]   = useState(false)
   const [modalNuevo, setModalNuevo]   = useState(false)
   const [modalEditar, setModalEditar] = useState(null)
   const [modalOrg, setModalOrg]       = useState(false)
   const [filtro, setFiltro]           = useState('todos')
+  const [busqueda, setBusqueda]       = useState('')
+  const [confirmToggle, setConfirmToggle] = useState(null)
+  const [togglingId, setTogglingId]   = useState(null)
+  const [errorToggle, setErrorToggle] = useState('')
 
   const { areas, cargos, loading: loadingOrg, recargar: recargarOrg } = useAreasYCargos()
 
   const cargarUsuarios = () => {
     setLoading(true)
+    setErrorCarga(false)
     usuariosAPI.getAll()
       .then(r => setUsuarios(r.data))
-      .catch(console.error)
+      .catch(() => setErrorCarga(true))
       .finally(() => setLoading(false))
   }
 
   useEffect(() => { cargarUsuarios() }, [])
 
-  const usuariosFiltrados = filtro === 'todos'
+  const toggleActivo = async (usuario) => {
+    setTogglingId(usuario.id)
+    setErrorToggle('')
+    try {
+      await usuariosAPI.update(usuario.id, { activo: !usuario.activo })
+      cargarUsuarios()
+    } catch (err) {
+      setErrorToggle(getErrorMessage(err, 'Error al cambiar el estado del usuario.'))
+    } finally {
+      setTogglingId(null)
+      setConfirmToggle(null)
+    }
+  }
+
+  const solicitarToggle = (usuario) => {
+    if (usuario.activo) setConfirmToggle(usuario)
+    else toggleActivo(usuario)
+  }
+
+  const usuariosActivos   = usuarios.filter(u => u.activo).length
+  const usuariosInactivos = usuarios.filter(u => !u.activo).length
+
+  const usuariosPorEstado = filtro === 'todos'
     ? usuarios
     : filtro === 'activos'
       ? usuarios.filter(u => u.activo)
       : usuarios.filter(u => !u.activo)
+
+  const usuariosFiltrados = busqueda.trim()
+    ? usuariosPorEstado.filter(u => {
+        const q = busqueda.trim().toLowerCase()
+        return (
+          u.nombre?.toLowerCase().includes(q) ||
+          u.email?.toLowerCase().includes(q) ||
+          (ROL_LABEL[u.role] || u.role)?.toLowerCase().includes(q) ||
+          u.area_nombre?.toLowerCase().includes(q) ||
+          u.cargo_nombre?.toLowerCase().includes(q)
+        )
+      })
+    : usuariosPorEstado
+
+  const { paginaItems: usuariosPagina, pagina, totalPaginas, setPagina } = usePaginacion(usuariosFiltrados)
 
   return (
     <div className="min-h-full px-4 sm:px-6 lg:px-8 py-6" style={{ backgroundColor: bg }}>
@@ -644,21 +719,61 @@ export default function Usuarios() {
 
       {/* Filtros */}
       <div className="flex gap-2 mb-6">
-        {['todos', 'activos', 'inactivos'].map(f => (
-          <button key={f} onClick={() => setFiltro(f)}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium capitalize transition"
+        {[
+          { key: 'todos',     label: 'Todos',     count: usuarios.length },
+          { key: 'activos',   label: 'Activos',   count: usuariosActivos },
+          { key: 'inactivos', label: 'Inactivos', count: usuariosInactivos },
+        ].map(f => (
+          <button key={f.key} onClick={() => setFiltro(f.key)}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium transition"
                   style={{
-                    backgroundColor: filtro === f ? '#6366F1' : card,
-                    color: filtro === f ? '#fff' : sub,
-                    border: `1px solid ${filtro === f ? '#6366F1' : border}`
+                    backgroundColor: filtro === f.key ? '#6366F1' : card,
+                    color: filtro === f.key ? '#fff' : sub,
+                    border: `1px solid ${filtro === f.key ? '#6366F1' : border}`
                   }}>
-            {f}
+            {f.label} ({f.count})
           </button>
         ))}
       </div>
 
+      {/* Búsqueda */}
+      <div className="flex items-center gap-2 mb-4 rounded-lg px-3 py-2"
+           style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+        <Search size={15} style={{ color: sub }} />
+        <input
+          type="text"
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value)}
+          placeholder="Buscar por nombre, correo, área, cargo o rol..."
+          className="bg-transparent text-sm outline-none flex-1 min-w-0"
+          style={{ color: text }}
+        />
+        {busqueda && (
+          <button onClick={() => setBusqueda('')} aria-label="Limpiar búsqueda">
+            <X size={14} style={{ color: sub }} />
+          </button>
+        )}
+      </div>
+
+      {errorToggle && (
+        <div className="text-sm rounded-lg px-4 py-3 mb-4"
+             style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.1)' : '#FEF2F2', border: `1px solid ${darkMode ? 'rgba(239,68,68,0.3)' : '#FECACA'}`, color: darkMode ? '#FCA5A5' : '#B91C1C' }}>
+          {errorToggle}
+        </div>
+      )}
+
       {/* Tabla */}
-      {loading ? (
+      {errorCarga ? (
+        <div className="text-center py-16">
+          <UserX size={40} className="mx-auto mb-3" style={{ color: sub }} />
+          <p className="text-sm mb-3" style={{ color: sub }}>No se pudieron cargar los usuarios.</p>
+          <button onClick={cargarUsuarios}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+                  style={{ backgroundColor: '#6366F1' }}>
+            Reintentar
+          </button>
+        </div>
+      ) : loading ? (
         <p className="text-center py-12 text-sm" style={{ color: sub }}>Cargando usuarios...</p>
       ) : (
         <>
@@ -674,7 +789,7 @@ export default function Usuarios() {
                 </tr>
               </thead>
               <tbody>
-                {usuariosFiltrados.map((u, i) => (
+                {usuariosPagina.map((u, i) => (
                   <tr key={u.id} style={{
                     backgroundColor: i % 2 === 0 ? card : darkMode ? '#0F1923' : '#F9FAFB',
                     borderTop: `1px solid ${border}`
@@ -682,14 +797,14 @@ export default function Usuarios() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                             style={{ backgroundColor: '#6366F1' }}>
+                             style={{ backgroundColor: ROL_AVATAR_COLOR[u.role] ?? '#6366F1' }}>
                           {u.nombre?.charAt(0).toUpperCase()}
                         </div>
                         <span className="font-medium" style={{ color: text }}>{u.nombre}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3" style={{ color: sub }}>{u.email}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-middle">
                       <div className="space-y-0.5">
                         {u.area_nombre  && <p className="text-xs font-medium" style={{ color: text }}>{u.area_nombre}</p>}
                         {u.cargo_nombre && <p className="text-xs" style={{ color: sub }}>{u.cargo_nombre}</p>}
@@ -706,11 +821,23 @@ export default function Usuarios() {
                         : <span className="flex items-center gap-1.5 text-xs text-red-400"><UserX size={14} /> Inactivo</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <button onClick={() => setModalEditar(u)}
-                              className="p-1.5 rounded-lg transition hover:opacity-80"
-                              style={{ backgroundColor: darkMode ? '#1F2937' : '#F3F4F6' }}>
-                        <Pencil size={14} style={{ color: '#6366F1' }} />
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => setModalEditar(u)} aria-label="Editar usuario"
+                                className="p-1.5 rounded-lg transition hover:opacity-80"
+                                style={{ backgroundColor: darkMode ? '#1F2937' : '#F3F4F6' }}>
+                          <Pencil size={14} style={{ color: '#6366F1' }} />
+                        </button>
+                        <button onClick={() => solicitarToggle(u)} disabled={togglingId === u.id}
+                                role="switch" aria-checked={u.activo}
+                                aria-label={u.activo ? 'Desactivar usuario' : 'Activar usuario'}
+                                title={u.activo ? 'Desactivar usuario' : 'Activar usuario'}
+                                className="p-1.5 rounded-lg transition hover:opacity-80 disabled:opacity-50"
+                                style={{ backgroundColor: darkMode ? '#1F2937' : '#F3F4F6' }}>
+                          {u.activo
+                            ? <PowerOff size={14} style={{ color: '#EF4444' }} />
+                            : <Power size={14} style={{ color: '#22C55E' }} />}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -718,7 +845,9 @@ export default function Usuarios() {
             </table>
             {usuariosFiltrados.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-sm" style={{ color: sub }}>No hay usuarios en este filtro.</p>
+                <p className="text-sm" style={{ color: sub }}>
+                  {busqueda.trim() ? `Sin resultados para "${busqueda.trim()}"` : 'No hay usuarios en este filtro.'}
+                </p>
               </div>
             )}
           </div>
@@ -726,15 +855,17 @@ export default function Usuarios() {
           {/* CARDS — móvil */}
           <div className="md:hidden space-y-3">
             {usuariosFiltrados.length === 0 && (
-              <p className="text-center py-12 text-sm" style={{ color: sub }}>No hay usuarios en este filtro.</p>
+              <p className="text-center py-12 text-sm" style={{ color: sub }}>
+                {busqueda.trim() ? `Sin resultados para "${busqueda.trim()}"` : 'No hay usuarios en este filtro.'}
+              </p>
             )}
-            {usuariosFiltrados.map(u => (
+            {usuariosPagina.map(u => (
               <div key={u.id} className="rounded-xl p-4 space-y-3"
                    style={{ backgroundColor: card, border: `1px solid ${border}` }}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-                         style={{ backgroundColor: '#6366F1' }}>
+                         style={{ backgroundColor: ROL_AVATAR_COLOR[u.role] ?? '#6366F1' }}>
                       {u.nombre?.charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -747,10 +878,22 @@ export default function Usuarios() {
                       )}
                     </div>
                   </div>
-                  <button onClick={() => setModalEditar(u)} className="p-2 rounded-lg"
-                          style={{ backgroundColor: darkMode ? '#1F2937' : '#F3F4F6' }}>
-                    <Pencil size={14} style={{ color: '#6366F1' }} />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setModalEditar(u)} aria-label="Editar usuario" className="p-2 rounded-lg"
+                            style={{ backgroundColor: darkMode ? '#1F2937' : '#F3F4F6' }}>
+                      <Pencil size={14} style={{ color: '#6366F1' }} />
+                    </button>
+                    <button onClick={() => solicitarToggle(u)} disabled={togglingId === u.id}
+                            role="switch" aria-checked={u.activo}
+                            aria-label={u.activo ? 'Desactivar usuario' : 'Activar usuario'}
+                            title={u.activo ? 'Desactivar usuario' : 'Activar usuario'}
+                            className="p-2 rounded-lg disabled:opacity-50"
+                            style={{ backgroundColor: darkMode ? '#1F2937' : '#F3F4F6' }}>
+                      {u.activo
+                        ? <PowerOff size={14} style={{ color: '#EF4444' }} />
+                        : <Power size={14} style={{ color: '#22C55E' }} />}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge text={ROL_LABEL[u.role] || u.role} colorClass={ROL_COLOR[u.role] || 'bg-gray-500/20 text-gray-300'} />
@@ -761,6 +904,8 @@ export default function Usuarios() {
               </div>
             ))}
           </div>
+
+          <Paginador pagina={pagina} totalPaginas={totalPaginas} onCambiar={setPagina} darkMode={darkMode} />
         </>
       )}
 
@@ -775,6 +920,17 @@ export default function Usuarios() {
         <ModalEditarUsuario darkMode={darkMode} usuario={modalEditar} areas={areas} cargos={cargos}
                             loadingOrg={loadingOrg} onClose={() => setModalEditar(null)} onActualizado={cargarUsuarios} />
       )}
+
+      <ConfirmDialog
+        open={!!confirmToggle}
+        title="¿Desactivar usuario?"
+        message="Este usuario perderá acceso al sistema. ¿Continuar?"
+        confirmLabel="Desactivar"
+        danger
+        loading={togglingId === confirmToggle?.id}
+        onConfirm={() => toggleActivo(confirmToggle)}
+        onCancel={() => setConfirmToggle(null)}
+      />
     </div>
   )
 }

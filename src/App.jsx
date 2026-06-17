@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
+import { ROLES } from './constants/roles'
 import Layout from './components/Layout'
+import ErrorBoundary from './components/ErrorBoundary'
 
 const Login          = lazy(() => import('./pages/Login'))
 const Dashboard      = lazy(() => import('./features/sst/pages/Dashboard'))
@@ -38,10 +40,12 @@ export default function App() {
 
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center h-screen" style={{ backgroundColor: '#0B0F19' }}>
+      <div className="flex items-center justify-center h-screen"
+           style={{ backgroundColor: localStorage.getItem('pisst_theme') === 'light' ? '#F9FAFB' : '#0B0F19' }}>
         <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
       </div>
     }>
+    <ErrorBoundary>
     <Routes>
       {/* ── Rutas públicas (sin Layout, accesibles sin sesión) ── */}
       <Route path="/login"           element={<Login />} />
@@ -52,27 +56,27 @@ export default function App() {
       {/* ── Redirección raíz según rol ── */}
       <Route path="/" element={
         <PrivateRoute>
-          {userRole === 'sst'      ? <Navigate to="/dashboard" replace /> :
-           userRole === 'gerencia' ? <Navigate to="/dashboard" replace /> :
-           userRole === 'empleado' ? <Navigate to="/empleado/chat" replace /> :
+          {userRole === ROLES.SST      ? <Navigate to="/dashboard" replace /> :
+           userRole === ROLES.GERENCIA ? <Navigate to="/dashboard" replace /> :
+           userRole === ROLES.EMPLEADO ? <Navigate to="/empleado/chat" replace /> :
            <Navigate to="/login" replace />}
         </PrivateRoute>
       }/>
 
       {/* ── Páginas protegidas (todas dentro del Layout) ── */}
-      <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
-        <Route path="/dashboard"      element={<PrivateRoute roles={['sst','gerencia']}><Dashboard /></PrivateRoute>} />
-        <Route path="/chat"           element={<PrivateRoute><Chat /></PrivateRoute>} />
-        <Route path="/incidentes"     element={<PrivateRoute><Incidentes /></PrivateRoute>} />
-        <Route path="/capacitaciones" element={<PrivateRoute roles={['sst']}><Capacitaciones /></PrivateRoute>} />
-        <Route path="/riesgos"        element={<PrivateRoute roles={['sst']}><Riesgos /></PrivateRoute>} />
-        <Route path="/auditorias"     element={<PrivateRoute roles={['sst']}><Auditorias /></PrivateRoute>} />
-        <Route path="/usuarios"       element={<PrivateRoute roles={['sst']}><Usuarios /></PrivateRoute>} />
-        <Route path="/perfil"         element={<PrivateRoute><PerfilSST /></PrivateRoute>} />
+      <Route element={<Layout />}>
+        <Route path="/dashboard"      element={<PrivateRoute roles={[ROLES.SST,ROLES.GERENCIA]}><Dashboard /></PrivateRoute>} />
+        <Route path="/chat"           element={<PrivateRoute roles={[ROLES.SST,ROLES.GERENCIA]}><Chat /></PrivateRoute>} />
+        <Route path="/incidentes"     element={<PrivateRoute roles={[ROLES.SST,ROLES.GERENCIA]}><Incidentes /></PrivateRoute>} />
+        <Route path="/capacitaciones" element={<PrivateRoute roles={[ROLES.SST]}><Capacitaciones /></PrivateRoute>} />
+        <Route path="/riesgos"        element={<PrivateRoute roles={[ROLES.SST]}><Riesgos /></PrivateRoute>} />
+        <Route path="/auditorias"     element={<PrivateRoute roles={[ROLES.SST]}><Auditorias /></PrivateRoute>} />
+        <Route path="/usuarios"       element={<PrivateRoute roles={[ROLES.SST]}><Usuarios /></PrivateRoute>} />
+        <Route path="/perfil"         element={<PrivateRoute roles={[ROLES.SST,ROLES.GERENCIA]}><PerfilSST /></PrivateRoute>} />
       </Route>
 
       {/* ── Páginas del rol empleado (layout propio) ── */}
-      <Route path="/empleado" element={<PrivateRoute roles={['empleado']}><EmpleadoLayout /></PrivateRoute>}>
+      <Route path="/empleado" element={<PrivateRoute roles={[ROLES.EMPLEADO]}><EmpleadoLayout /></PrivateRoute>}>
         <Route index               element={<Navigate to="chat" replace />} />
         <Route path="chat"          element={<EmpleadoChat />} />
         <Route path="reporte"       element={<EmpleadoReporte />} />
@@ -83,6 +87,7 @@ export default function App() {
       {/* ── Catch-all ── */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
+    </ErrorBoundary>
     </Suspense>
   )
 }

@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTema } from './EmpleadoLayout'
 import {
-  Send, Plus, Trash2, Search, Paperclip,
-  Shield, BookOpen, GraduationCap, User, ArrowUp
+  Send, Paperclip,
+  Shield, BookOpen, GraduationCap, User, ArrowUp, CheckCheck, AlertTriangle
 } from 'lucide-react'
 import { chatAPI, getErrorMessage } from '../../../services/api'
 import logoChatImg from '../../../assets/imagenes/logo_chat.png'
@@ -59,12 +59,13 @@ export default function EmpleadoChat() {
   const navigate  = useNavigate()
   const { tk }    = useTema()
 
-  const [messages, setMessages] = useState([{
-    id: 1, from: 'bot',
+  const GREETING = {
+    id: 'greeting', from: 'bot',
     text: 'Estoy aquí para ayudarte con todo lo relacionado con Seguridad y Salud en el Trabajo.',
     hora: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
-  }])
-  const [historial, setHistorial] = useState([])   // conversaciones del panel derecho
+  }
+
+  const [messages, setMessages] = useState([GREETING])
   const [input,     setInput]     = useState('')
   const [typing,    setTyping]    = useState(false)
   const [archivoError, setArchivoError] = useState(null)
@@ -73,10 +74,25 @@ export default function EmpleadoChat() {
   const textareaRef               = useRef(null)
   const fileInputRef              = useRef(null)
 
-  // Cargar historial al montar
+  // Cargar la conversación anterior y mostrarla dentro del propio chat
   useEffect(() => {
-    chatAPI.getHistorial(1, 5)
-      .then(res => setHistorial(res.data))
+    chatAPI.getHistorial(1, 10)
+      .then(res => {
+        const data = Array.isArray(res.data) ? res.data : []
+        if (data.length === 0) return
+        const formatHora = (ts) => ts
+          ? new Date(ts).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+          : ''
+        const previos = [...data].reverse().flatMap((h, i) => {
+          const par = []
+          if (h.mensaje) par.push({ id: `hist-${i}-u`, from: 'user', text: h.mensaje, hora: formatHora(h.timestamp) })
+          if (h.respuesta) par.push({ id: `hist-${i}-b`, from: 'bot', text: h.respuesta, hora: formatHora(h.timestamp) })
+          return par
+        })
+        if (previos.length > 0) {
+          setMessages(p => [...previos, { id: 'divider-nueva', type: 'divider', text: 'Conversación nueva' }, ...p])
+        }
+      })
       .catch(() => {}) // silencioso si no hay historial aún
   }, [])
 
@@ -209,66 +225,68 @@ export default function EmpleadoChat() {
     e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'
   }
 
-  const resetChat = () => {
-    setMessages([{
-      id: 1, from: 'bot',
-      text: 'Estoy aquí para ayudarte con todo lo relacionado con Seguridad y Salud en el Trabajo.',
-      hora: hora()
-    }])
-  }
-
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
       {/* ── ÁREA CENTRAL ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
 
         {/* Header chat */}
         <div style={{
+          flexShrink: 0,
           padding: '14px 24px', borderBottom: `1px solid ${tk.border}`,
           display: 'flex', alignItems: 'center', gap: 14,
           backgroundColor: tk.sidebar, transition: 'background-color 0.2s'
         }}>
           <SasbotLogo size={46} />
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontWeight: 700, fontSize: 17, color: tk.text }}>SASBOT</span>
-              <span style={{
+              <span className="empleado-chat-header-extra" style={{
                 fontSize: 11, padding: '2px 8px', borderRadius: 20,
                 backgroundColor: 'rgba(99,102,241,0.15)', color: '#818CF8',
                 border: '1px solid rgba(99,102,241,0.3)', fontWeight: 500
               }}>Asistente Virtual de PISST</span>
             </div>
-            <div style={{ fontSize: 12, color: tk.textFaint, marginTop: 2 }}>
+            <div className="empleado-chat-header-extra" style={{ fontSize: 12, color: tk.textFaint, marginTop: 2 }}>
               Estoy aquí para ayudarte con todo lo relacionado con Seguridad y Salud en el Trabajo.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={resetChat} style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 14px', borderRadius: 8,
-              border: `1px solid ${tk.border}`, backgroundColor: tk.card,
-              color: tk.textMuted, fontSize: 13, cursor: 'pointer'
-            }}>
-              <Plus size={14} /> Nueva conversación
-            </button>
-            <button onClick={resetChat} style={{
-              padding: '7px 10px', borderRadius: 8,
-              border: `1px solid ${tk.border}`, backgroundColor: tk.card,
-              color: tk.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center'
-            }}>
-              <Trash2 size={15} />
+            <button
+              onClick={escalar}
+              disabled={escalando}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 8,
+                border: 'none', background: escalando ? tk.border : 'linear-gradient(135deg,#4F46E5,#7C3AED)',
+                color: escalando ? tk.textFaint : '#fff', fontSize: 13, fontWeight: 600,
+                cursor: escalando ? 'not-allowed' : 'pointer', opacity: escalando ? 0.6 : 1
+              }}>
+              <ArrowUp size={14} />
+              {escalando
+                ? 'Escalando...'
+                : <>Escalar<span className="empleado-chat-header-extra"> al Coordinador SST</span></>}
             </button>
           </div>
         </div>
 
         {/* Mensajes */}
         <div style={{
-          flex: 1, overflowY: 'auto', padding: '20px 24px',
+          flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px',
           display: 'flex', flexDirection: 'column', gap: 16,
           backgroundColor: tk.bg
         }}>
-          {messages.map(msg => (
+          {messages.map(msg => msg.type === 'divider' ? (
+            <div key={msg.id} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              margin: '4px 0', color: tk.textFaint, fontSize: 11
+            }}>
+              <div style={{ flex: 1, height: 1, backgroundColor: tk.border }} />
+              {msg.text}
+              <div style={{ flex: 1, height: 1, backgroundColor: tk.border }} />
+            </div>
+          ) : (
             <div key={msg.id} style={{
               display: 'flex',
               flexDirection: msg.from === 'user' ? 'row-reverse' : 'row',
@@ -305,7 +323,7 @@ export default function EmpleadoChat() {
                       fontSize: 11, fontWeight: 700, color: '#EF4444',
                       marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4
                     }}>
-                      🚨 MODO EMERGENCIA — Llama al 123
+                      <AlertTriangle size={12} /> MODO EMERGENCIA — Llama al 123
                     </div>
                   )}
                   {msg.text}
@@ -315,11 +333,12 @@ export default function EmpleadoChat() {
                   display: 'flex', alignItems: 'center', gap: 4
                 }}>
                   {msg.hora}
-                  {msg.from === 'user' && <span style={{ color: '#6366F1' }}>✓✓</span>}
+                  {msg.from === 'user' && <CheckCheck size={13} style={{ color: '#6366F1' }} />}
                 </span>
               </div>
             </div>
           ))}
+
 
           {typing && (
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
@@ -341,7 +360,7 @@ export default function EmpleadoChat() {
         </div>
 
         {/* Sugerencias */}
-        <div style={{ padding: '0 24px 10px', backgroundColor: tk.bg }}>
+        <div className="empleado-chat-suggestions" style={{ flexShrink: 0, padding: '0 24px 10px', backgroundColor: tk.bg }}>
           <div style={{ fontSize: 12, color: tk.textFaint, marginBottom: 8, fontWeight: 500 }}>Sugerencias rápidas</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {SUGERENCIAS.map(({ icon: Icon, label, ruta }) => (
@@ -363,7 +382,8 @@ export default function EmpleadoChat() {
         </div>
 
         {/* Disclaimer */}
-        <div style={{
+        <div className="empleado-chat-disclaimer" style={{
+          flexShrink: 0,
           margin: '0 24px 10px', padding: '8px 12px', borderRadius: 8,
           backgroundColor: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)',
           fontSize: 12, color: tk.textFaint, display: 'flex', alignItems: 'center', gap: 8
@@ -374,6 +394,7 @@ export default function EmpleadoChat() {
 
         {/* Input */}
         <div style={{
+          flexShrink: 0,
           margin: '0 24px 20px',
           backgroundColor: tk.card, border: `1px solid ${tk.border}`,
           borderRadius: 14, overflow: 'hidden'
@@ -433,110 +454,15 @@ export default function EmpleadoChat() {
             </button>
           </div>
         </div>
-      </div>
 
-      {/* ── PANEL DERECHO ── */}
-      <aside style={{
-        width: 280, flexShrink: 0,
-        borderLeft: `1px solid ${tk.border}`,
-        backgroundColor: tk.sidebar, overflowY: 'auto',
-        padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 20,
-        transition: 'background-color 0.2s'
-      }}>
-
-        {/* Historial */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>Historial de conversaciones</span>
-            <Search size={15} color={tk.textFaint} style={{ cursor: 'pointer' }} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {historial.length > 0 ? historial.map((h, i) => (
-              <div key={i} style={{
-                padding: '9px 10px', borderRadius: 8, cursor: 'pointer',
-                backgroundColor: i === 0 ? 'rgba(99,102,241,0.1)' : 'transparent',
-                border: i === 0 ? '1px solid rgba(99,102,241,0.2)' : '1px solid transparent',
-                transition: 'all 0.15s'
-              }}
-                onMouseEnter={e => { if (i !== 0) e.currentTarget.style.backgroundColor = tk.navHover }}
-                onMouseLeave={e => { if (i !== 0) e.currentTarget.style.backgroundColor = 'transparent' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  <span style={{ fontSize: 14, marginTop: 1 }}>💬</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 12, color: i === 0 ? '#A5B4FC' : tk.textMuted,
-                      overflow: 'hidden', display: '-webkit-box',
-                      WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4
-                    }}>{h.mensaje}</div>
-                    <div style={{ fontSize: 11, color: tk.textFaint, marginTop: 2 }}>
-                      {new Date(h.timestamp).toLocaleString('es-CO', {
-                        hour: '2-digit', minute: '2-digit',
-                        day: '2-digit', month: 'short'
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )) : (
-              <div style={{ fontSize: 12, color: tk.textFaint, textAlign: 'center', padding: '12px 0' }}>
-                Aún no hay conversaciones previas.
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => chatAPI.getHistorial(1, 20).then(res => setHistorial(res.data)).catch(() => {})}
-            style={{
-              marginTop: 8, width: '100%', padding: '7px 0', borderRadius: 7,
-              border: `1px solid ${tk.border}`, backgroundColor: 'transparent',
-              color: '#6366F1', fontSize: 12, cursor: 'pointer'
-            }}>
-            Ver más conversaciones
-          </button>
-        </div>
-
-        {/* Ayuda adicional */}
+        {/* Marco normativo — pie de página */}
         <div style={{
-          padding: 14, borderRadius: 10,
-          backgroundColor: tk.card, border: `1px solid ${tk.border}`
+          flexShrink: 0, textAlign: 'center', padding: '0 24px 14px',
+          fontSize: 11, color: tk.textFaint
         }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: tk.text, marginBottom: 6 }}>¿Necesitas ayuda adicional?</div>
-          <div style={{ fontSize: 12, color: tk.textFaint, marginBottom: 12, lineHeight: 1.5 }}>
-            Si la respuesta del asistente no resuelve tu inquietud, puedes escalar la conversación al Coordinador SST.
-          </div>
-          <button
-            onClick={escalar}
-            disabled={escalando}
-            style={{
-              width: '100%', padding: '9px 0', borderRadius: 8,
-              border: `1px solid ${tk.border}`, backgroundColor: tk.sidebar,
-              color: tk.text, fontSize: 13, fontWeight: 500,
-              cursor: escalando ? 'not-allowed' : 'pointer', opacity: escalando ? 0.6 : 1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7
-            }}>
-            <ArrowUp size={14} /> {escalando ? 'Escalando...' : 'Escalar al Coordinador SST'}
-          </button>
-          <div style={{ fontSize: 11, color: tk.textFaint, marginTop: 8, textAlign: 'center' }}>
-            Se notificará al Coordinador con el historial de esta conversación.
-          </div>
+          Basado en {NORMATIVA.map(n => n.titulo).join(' · ')}
         </div>
-
-        {/* Marco normativo */}
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: tk.text, marginBottom: 10 }}>Marco normativo de referencia</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {NORMATIVA.map(n => (
-              <div key={n.titulo} style={{ display: 'flex', gap: 8 }}>
-                <span style={{ color: '#6366F1', marginTop: 2 }}>•</span>
-                <div>
-                  <div style={{ fontSize: 12, color: tk.textMuted, fontWeight: 500 }}>{n.titulo}</div>
-                  <div style={{ fontSize: 11, color: tk.textFaint }}>{n.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </aside>
+      </div>
     </div>
   )
 }

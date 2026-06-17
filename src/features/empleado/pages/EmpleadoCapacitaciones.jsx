@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react'
-import { useAuth } from '../../../context/AuthContext'
+import { useState, useEffect, useMemo } from 'react'
 import { useTema } from './EmpleadoLayout'
 import {
   GraduationCap, CheckCircle, XCircle, Download,
@@ -7,6 +6,8 @@ import {
   BarChart2, AlertCircle, Loader, RefreshCw, FileText
 } from 'lucide-react'
 import { capacitacionesAPI } from '../../../services/api'
+import { useAuth } from '../../../context/AuthContext'
+import Spinner from '../../../components/Spinner'
 
 /* ────────────────────────────────────────────────────────────────
    ESTADOS de la página:
@@ -25,14 +26,6 @@ function Badge({ texto, color, bg }) {
   )
 }
 
-function Spinner() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 48 }}>
-      <Loader size={28} color="#6366F1" style={{ animation: 'spin 1s linear infinite' }} />
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
-    </div>
-  )
-}
 
 function EstadoBadge({ aprobado }) {
   return aprobado
@@ -43,25 +36,151 @@ function EstadoBadge({ aprobado }) {
 /* ── Estado de la sesión (programada/realizada/no_realizada/cancelada/pendiente) ── */
 function estadoSesion(fila) {
   const estado = fila.estado || fila.sesion_estado || 'programada'
-  if (estado === 'cancelada')    return { label: 'Cancelada',    color: '#9CA3AF', bg: 'rgba(107,114,128,0.15)' }
+  if (estado === 'cancelada')    return { label: 'Cancelada',    color: '#CBD5E1', bg: 'rgba(107,114,128,0.15)' }
   if (estado === 'realizada')    return { label: 'Realizada',    color: '#22C55E', bg: 'rgba(34,197,94,0.12)'   }
   if (estado === 'no_realizada') return { label: 'No realizada', color: '#EF4444', bg: 'rgba(239,68,68,0.12)'   }
   if (!fila.fecha_sesion) return { label: 'Programada', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' }
-  const normalized = /[Z+-]\d{2}:\d{2}$|Z$/.test(fila.fecha_sesion) ? fila.fecha_sesion : fila.fecha_sesion + 'Z'
+  const normalized = normFecha(fila.fecha_sesion)
   const esPasada = new Date(normalized) < new Date()
   if (esPasada) return { label: 'Pendiente', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' }
   return { label: 'Programada', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' }
 }
 
+/* ── Fila de una sesión dentro de una capacitación expandida ── */
+function SesionRow({ fila, tk, onEvaluacion, onCertificado }) {
+  const tieneEval   = !!fila.evaluacion_id
+  const aprobado    = fila.resultado?.aprobado
+  const yaRespondio = fila.resultado !== null && fila.resultado !== undefined
+  const estado      = estadoSesion(fila)
+  const estadoBase  = fila.estado || fila.sesion_estado || 'programada'
+  const puedeConfirmarAsistencia = ['programada', 'pendiente'].includes(estadoBase)
+  const [asistencia, setAsistencia] = useState('idle') // idle | enviando | ok | error
+
+  const confirmarAsistencia = async () => {
+    setAsistencia('enviando')
+    try {
+      await capacitacionesAPI.registrarAsistenciaPropia(fila.sesion_id)
+      setAsistencia('ok')
+    } catch {
+      setAsistencia('error')
+    }
+  }
+
+  return (
+    <div className="ecap-sesion-row" style={{
+      padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 14,
+      borderTop: `1px solid ${tk.border}`, flexWrap: 'wrap'
+    }}>
+      {/* Icono */}
+      <div style={{
+        width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+        backgroundColor: aprobado === true
+          ? 'rgba(34,197,94,0.12)'
+          : aprobado === false
+            ? 'rgba(239,68,68,0.1)'
+            : 'rgba(99,102,241,0.1)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        {aprobado === true
+          ? <Award size={16} color="#22C55E" />
+          : aprobado === false
+            ? <XCircle size={16} color="#EF4444" />
+            : <Clock size={16} color="#818CF8" />
+        }
+      </div>
+
+      {/* Info */}
+      <div style={{ flex: 1, minWidth: 160 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: tk.text }}>
+            {fila.fecha_sesion
+              ? new Date(/[Z+-]\d{2}:\d{2}$|Z$/.test(fila.fecha_sesion) ? fila.fecha_sesion : fila.fecha_sesion + 'Z')
+                  .toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Bogota' })
+              : 'Sin fecha'}
+          </span>
+          {tieneEval && !yaRespondio
+            ? <Badge texto="Evaluación pendiente" color="#F59E0B" bg="rgba(245,158,11,0.1)" />
+            : <Badge texto={estado.label} color={estado.color} bg={estado.bg} />
+          }
+          {yaRespondio && <EstadoBadge aprobado={aprobado} />}
+        </div>
+        {yaRespondio && (
+          <div style={{ fontSize: 12, color: tk.textFaint, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <BarChart2 size={11} />
+            {fila.resultado.puntaje_final ?? '—'}% — {fila.resultado.respuestas_correctas}/{fila.resultado.total_preguntas} correctas
+          </div>
+        )}
+      </div>
+
+      {/* Acciones */}
+      <div className="ecap-sesion-acciones" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
+        {puedeConfirmarAsistencia && asistencia !== 'ok' && (
+          <button
+            onClick={confirmarAsistencia}
+            disabled={asistencia === 'enviando'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', borderRadius: 8, cursor: asistencia === 'enviando' ? 'not-allowed' : 'pointer',
+              border: '1px solid rgba(99,102,241,0.4)',
+              backgroundColor: 'rgba(99,102,241,0.1)',
+              color: '#818CF8', fontSize: 12, fontWeight: 500,
+              opacity: asistencia === 'enviando' ? 0.6 : 1
+            }}
+          >
+            {asistencia === 'enviando'
+              ? <><Loader size={13} className="motion-safe:animate-spin" /> Confirmando...</>
+              : asistencia === 'error'
+                ? <><AlertCircle size={13} /> Reintentar asistencia</>
+                : <><CheckCircle size={13} /> Confirmar asistencia</>
+            }
+          </button>
+        )}
+        {asistencia === 'ok' && (
+          <Badge texto="Asistencia confirmada" color="#22C55E" bg="rgba(34,197,94,0.1)" />
+        )}
+        {aprobado && (
+          <button
+            onClick={() => onCertificado(fila)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+              border: '1px solid rgba(34,197,94,0.4)',
+              backgroundColor: 'rgba(34,197,94,0.08)',
+              color: '#22C55E', fontSize: 12, fontWeight: 500
+            }}
+          >
+            <Download size={13} /> Certificado
+          </button>
+        )}
+        {tieneEval && !yaRespondio && (
+          <button
+            onClick={() => onEvaluacion(fila)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+              border: '1px solid rgba(99,102,241,0.4)',
+              backgroundColor: 'rgba(99,102,241,0.1)',
+              color: '#818CF8', fontSize: 12, fontWeight: 500
+            }}
+          >
+            <FileText size={13} /> Hacer evaluación
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function EmpleadoCapacitaciones() {
-  const { user }  = useAuth()
-  const { tk }    = useTema()
-  const empleadoId = user?.id
+  const { tk }      = useTema()
+  const { user }    = useAuth()
+  const empleadoId  = user?.id
 
   const [vista,        setVista]        = useState('historial')  // 'historial' | 'evaluacion' | 'resultado'
   const [historial,    setHistorial]    = useState([])
   const [cargando,     setCargando]     = useState(true)
   const [errorGlobal,  setErrorGlobal]  = useState(null)
+  const [expandidos,   setExpandidos]   = useState(new Set())
 
   // Evaluación activa
   const [evaluacionActual, setEvaluacionActual] = useState(null)   // objeto con preguntas
@@ -74,6 +193,7 @@ export default function EmpleadoCapacitaciones() {
   // Resultado
   const [resultado,    setResultado]    = useState(null)  // { puntaje_final, aprobado, total_preguntas, respuestas_correctas }
   const [descargando,  setDescargando]  = useState(false)
+  const [errorCert,    setErrorCert]    = useState(null)
 
   /* ── Cargar historial ── */
   const cargarHistorial = () => {
@@ -89,6 +209,46 @@ export default function EmpleadoCapacitaciones() {
   }
 
   useEffect(() => { if (empleadoId) cargarHistorial() }, [empleadoId])
+
+  /* ── Agrupar el historial (por sesión) en capacitaciones ── */
+  const capacitaciones = useMemo(() => {
+    const grupos = new Map()
+    historial.forEach(fila => {
+      const key = fila.capacitacion_id ?? fila.capacitacion_nombre ?? 'sin-id'
+      if (!grupos.has(key)) {
+        grupos.set(key, {
+          id: key,
+          nombre: fila.capacitacion_nombre || 'Capacitación',
+          activo: fila.capacitacion_activo ?? fila.activo ?? true,
+          sesiones: []
+        })
+      }
+      // Filas "placeholder" (capacitación sin ninguna sesión creada todavía):
+      // fecha_sesion/estado/evaluacion_id vienen todos en null. No se
+      // muestran como sesión, solo sirven para que la capacitación aparezca.
+      const esPlaceholder = !fila.fecha_sesion && !fila.estado && !fila.sesion_estado && !fila.evaluacion_id
+      if (!esPlaceholder) {
+        grupos.get(key).sesiones.push(fila)
+      }
+    })
+    return Array.from(grupos.values()).map(g => ({
+      ...g,
+      sesiones: g.sesiones.slice().sort((a, b) => {
+        const fa = a.fecha_sesion ? new Date(a.fecha_sesion) : new Date(0)
+        const fb = b.fecha_sesion ? new Date(b.fecha_sesion) : new Date(0)
+        return fb - fa
+      })
+    }))
+  }, [historial])
+
+  const toggleExpandido = (id) => {
+    setExpandidos(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   /* ── Abrir evaluación ── */
   const abrirEvaluacion = (fila) => {
@@ -136,19 +296,22 @@ export default function EmpleadoCapacitaciones() {
   }
 
   /* ── Descargar certificado ── */
-  const descargarCertificado = async () => {
-    if (!sesionActual?.evaluacion_id) return
+  const descargarCertificado = async (fila) => {
+    const objetivo = fila || sesionActual
+    if (!objetivo?.evaluacion_id) return
+    setSesionActual(objetivo)
     setDescargando(true)
+    setErrorCert(null)
     try {
-      const res = await capacitacionesAPI.getCertificado(sesionActual.evaluacion_id, empleadoId)
+      const res = await capacitacionesAPI.getCertificado(objetivo.evaluacion_id, empleadoId)
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
       const a = document.createElement('a')
       a.href = url
-      a.download = `certificado_${sesionActual.capacitacion_nombre || 'capacitacion'}.pdf`
+      a.download = `certificado_${objetivo.capacitacion_nombre || 'capacitacion'}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      alert('No se pudo descargar el certificado. Asegúrate de haber aprobado la evaluación.')
+      setErrorCert('No se pudo descargar el certificado. Asegúrate de haber aprobado la evaluación.')
     } finally {
       setDescargando(false)
     }
@@ -156,7 +319,16 @@ export default function EmpleadoCapacitaciones() {
 
   /* ────────── RENDER HISTORIAL ────────── */
   if (vista === 'historial') return (
-    <div style={{ padding: 28, maxWidth: 900, margin: '0 auto' }}>
+    <div className="ecap-container" style={{ padding: 28, maxWidth: 900, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+      <style>{`
+        .ecap-container { overflow-x: hidden; }
+        @media (max-width: 640px) {
+          .ecap-container { padding: 16px !important; }
+          .ecap-sesion-row { flex-direction: column; align-items: flex-start !important; }
+          .ecap-sesion-acciones { width: 100%; }
+          .ecap-sesion-acciones button { flex: 1; justify-content: center; }
+        }
+      `}</style>
 
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
@@ -177,6 +349,22 @@ export default function EmpleadoCapacitaciones() {
 
       {/* Estado de carga / error */}
       {cargando && <Spinner />}
+      {errorCert && !cargando && (
+        <div style={{
+          padding: '12px 16px', borderRadius: 10, marginBottom: 16,
+          backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+          display: 'flex', alignItems: 'center', gap: 10, color: '#EF4444', fontSize: 13
+        }}>
+          <AlertCircle size={16} />
+          {errorCert}
+          <button onClick={() => setErrorCert(null)} style={{
+            marginLeft: 'auto', background: 'none', border: 'none',
+            color: '#EF4444', fontSize: 12, cursor: 'pointer'
+          }}>
+            Cerrar
+          </button>
+        </div>
+      )}
       {errorGlobal && !cargando && (
         <div style={{
           padding: '16px 20px', borderRadius: 10,
@@ -195,112 +383,106 @@ export default function EmpleadoCapacitaciones() {
         </div>
       )}
 
-      {/* Lista historial */}
+      {/* Resumen evaluaciones pendientes */}
+      {!cargando && !errorGlobal && capacitaciones.length > 0 && (() => {
+        const totalPendientes = capacitaciones.reduce((acc, g) =>
+          acc + g.sesiones.filter(s => s.evaluacion_id && (s.resultado === null || s.resultado === undefined)).length, 0)
+        return totalPendientes > 0 ? (
+          <div style={{
+            padding: '12px 16px', borderRadius: 10, marginBottom: 16,
+            backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
+            display: 'flex', alignItems: 'center', gap: 10, color: '#F59E0B', fontSize: 13
+          }}>
+            <AlertCircle size={16} style={{ flexShrink: 0 }} />
+            Tienes <strong style={{ marginLeft: 4, marginRight: 4 }}>{totalPendientes}</strong>
+            evaluación{totalPendientes > 1 ? 'es' : ''} pendiente{totalPendientes > 1 ? 's' : ''} por completar.
+          </div>
+        ) : null
+      })()}
+
+      {/* Lista de capacitaciones */}
       {!cargando && !errorGlobal && (
-        historial.length === 0
+        capacitaciones.length === 0
           ? (
             <div style={{
               textAlign: 'center', padding: '60px 20px',
               color: tk.textFaint, fontSize: 14
             }}>
               <BookOpen size={40} color={tk.border} style={{ marginBottom: 12 }} />
-              <p style={{ margin: 0 }}>Aún no tienes capacitaciones registradas.</p>
+              <p style={{ margin: 0 }}>Aún no tienes capacitaciones asignadas.</p>
             </div>
           )
           : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {historial.map((fila, i) => {
-                const tieneEval   = !!fila.evaluacion_id
-                const aprobado    = fila.resultado?.aprobado
-                const yaRespondio = fila.resultado !== null && fila.resultado !== undefined
-                const estado      = estadoSesion(fila)
+              {capacitaciones.map(grupo => {
+                const expandido = expandidos.has(grupo.id)
+                const pendientes = grupo.sesiones.filter(f =>
+                  f.evaluacion_id && (f.resultado === null || f.resultado === undefined)
+                ).length
 
                 return (
-                  <div key={i} style={{
-                    padding: '16px 20px', borderRadius: 12,
-                    backgroundColor: tk.card, border: `1px solid ${tk.border}`,
-                    display: 'flex', alignItems: 'center', gap: 16,
-                    transition: 'border-color 0.15s'
+                  <div key={grupo.id} style={{
+                    borderRadius: 12, backgroundColor: tk.card,
+                    border: `1px solid ${tk.border}`, overflow: 'hidden'
                   }}>
-                    {/* Icono */}
-                    <div style={{
-                      width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-                      backgroundColor: aprobado === true
-                        ? 'rgba(34,197,94,0.12)'
-                        : aprobado === false
-                          ? 'rgba(239,68,68,0.1)'
-                          : 'rgba(99,102,241,0.1)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}>
-                      {aprobado === true
-                        ? <Award size={20} color="#22C55E" />
-                        : aprobado === false
-                          ? <XCircle size={20} color="#EF4444" />
-                          : <BookOpen size={20} color="#818CF8" />
-                      }
-                    </div>
-
-                    {/* Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 600, fontSize: 14, color: tk.text }}>
-                          {fila.capacitacion_nombre || 'Capacitación'}
-                        </span>
-                        <Badge texto={estado.label} color={estado.color} bg={estado.bg} />
-                        {yaRespondio && <EstadoBadge aprobado={aprobado} />}
-                        {tieneEval && !yaRespondio && (
-                          <Badge texto="Evaluación pendiente" color="#F59E0B" bg="rgba(245,158,11,0.1)" />
-                        )}
+                    {/* Encabezado de la capacitación */}
+                    <div
+                      onClick={() => toggleExpandido(grupo.id)}
+                      style={{
+                        padding: '16px 20px', display: 'flex', alignItems: 'center',
+                        gap: 16, cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{
+                        width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                        backgroundColor: 'rgba(99,102,241,0.1)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        <GraduationCap size={20} color="#818CF8" />
                       </div>
-                      <div style={{ fontSize: 12, color: tk.textFaint, marginTop: 4, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Clock size={11} />
-                          {fila.fecha_sesion
-                            ? new Date(fila.fecha_sesion + 'Z').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Bogota' })
-                            : 'Sin fecha'}
-                        </span>
-                        {yaRespondio && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <BarChart2 size={11} />
-                            {fila.resultado.puntaje_final ?? '—'}% — {fila.resultado.respuestas_correctas}/{fila.resultado.total_preguntas} correctas
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 600, fontSize: 14, color: tk.text }}>
+                            {grupo.nombre}
                           </span>
-                        )}
+                          {!grupo.activo && (
+                            <Badge texto="Suspendida" color="#CBD5E1" bg="rgba(107,114,128,0.15)" />
+                          )}
+                          {pendientes > 0 && (
+                            <Badge
+                              texto={`${pendientes} evaluación${pendientes > 1 ? 'es' : ''} pendiente${pendientes > 1 ? 's' : ''}`}
+                              color="#F59E0B" bg="rgba(245,158,11,0.1)"
+                            />
+                          )}
+                        </div>
+                        <div style={{ fontSize: 12, color: tk.textFaint, marginTop: 4 }}>
+                          {grupo.sesiones.length === 0
+                            ? 'Sin sesiones programadas'
+                            : `${grupo.sesiones.length} sesión${grupo.sesiones.length > 1 ? 'es' : ''}`}
+                        </div>
                       </div>
+
+                      <ChevronRight size={18} color={tk.textFaint} style={{
+                        flexShrink: 0, transition: 'transform 0.15s',
+                        transform: expandido ? 'rotate(90deg)' : 'none'
+                      }} />
                     </div>
 
-                    {/* Acciones */}
-                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                      {/* Descargar certificado */}
-                      {aprobado && (
-                        <button
-                          onClick={() => { setSesionActual(fila); descargarCertificado() }}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 6,
-                            padding: '7px 12px', borderRadius: 8, cursor: 'pointer',
-                            border: '1px solid rgba(34,197,94,0.4)',
-                            backgroundColor: 'rgba(34,197,94,0.08)',
-                            color: '#22C55E', fontSize: 12, fontWeight: 500
-                          }}
-                        >
-                          <Download size={13} /> Certificado
-                        </button>
-                      )}
-                      {/* Responder evaluación */}
-                      {tieneEval && !yaRespondio && (
-                        <button
-                          onClick={() => abrirEvaluacion(fila)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 6,
-                            padding: '7px 12px', borderRadius: 8, cursor: 'pointer',
-                            border: '1px solid rgba(99,102,241,0.4)',
-                            backgroundColor: 'rgba(99,102,241,0.1)',
-                            color: '#818CF8', fontSize: 12, fontWeight: 500
-                          }}
-                        >
-                          <FileText size={13} /> Hacer evaluación
-                        </button>
-                      )}
-                    </div>
+                    {/* Sesiones de la capacitación */}
+                    {expandido && (
+                      grupo.sesiones.length === 0 ? (
+                        <div style={{ padding: '12px 20px', borderTop: `1px solid ${tk.border}`, fontSize: 13, color: tk.textFaint }}>
+                          Aún no se ha programado ninguna sesión para esta capacitación.
+                        </div>
+                      ) : grupo.sesiones.map((fila, i) => (
+                        <SesionRow
+                          key={i} fila={fila} tk={tk}
+                          onEvaluacion={abrirEvaluacion}
+                          onCertificado={descargarCertificado}
+                        />
+                      ))
+                    )}
                   </div>
                 )
               })}
@@ -320,7 +502,8 @@ export default function EmpleadoCapacitaciones() {
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
           background: 'none', border: 'none', cursor: 'pointer',
-          color: tk.textMuted, fontSize: 13, marginBottom: 20, padding: 0
+          color: tk.navColor, fontSize: 13, marginBottom: 20, padding: 0,
+          fontWeight: 600,
         }}
       >
         <ChevronLeft size={16} /> Volver al historial
@@ -457,7 +640,7 @@ export default function EmpleadoCapacitaciones() {
               }}
             >
               {enviando
-                ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Enviando...</>
+                ? <><Loader size={14} className="motion-safe:animate-spin" /> Enviando...</>
                 : <><CheckCircle size={14} /> Enviar evaluación</>
               }
             </button>
@@ -515,11 +698,22 @@ export default function EmpleadoCapacitaciones() {
           ))}
         </div>
 
+        {/* Error certificado */}
+        {errorCert && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 8, marginBottom: 16,
+            backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+            fontSize: 13, color: '#EF4444', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left'
+          }}>
+            <AlertCircle size={14} /> {errorCert}
+          </div>
+        )}
+
         {/* Botones */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {resultado?.aprobado && (
             <button
-              onClick={descargarCertificado}
+              onClick={() => descargarCertificado(sesionActual)}
               disabled={descargando}
               style={{
                 width: '100%', padding: '12px 0', borderRadius: 10, cursor: 'pointer',
@@ -529,7 +723,7 @@ export default function EmpleadoCapacitaciones() {
               }}
             >
               {descargando
-                ? <><Loader size={15} style={{ animation: 'spin 1s linear infinite' }} /> Descargando...</>
+                ? <><Loader size={15} className="motion-safe:animate-spin" /> Descargando...</>
                 : <><Download size={15} /> Descargar certificado PDF</>
               }
             </button>

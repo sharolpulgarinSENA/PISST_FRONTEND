@@ -34,16 +34,17 @@ export default function MobileBottomNav({ darkMode, active = 'dashboard', onChan
                 onClick={() => onChange?.(id)}
                 title={label}
                 aria-label={label}
+                aria-current={isActive ? 'page' : undefined}
                 className="w-full flex flex-col items-center gap-1 py-2 rounded-lg transition"
                 style={{
                   color: isActive
                     ? '#6366F1'
-                    : darkMode ? '#9CA3AF' : '#6B7280',
+                    : darkMode ? '#CBD5E1' : '#6B7280',
                 }}
               >
                 <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
                 {/* Labels SOLO en md+ (tablet en adelante) — en móvil no caben */}
-                <span className="hidden md:block text-[10px] font-medium leading-none">
+                <span className="hidden sm:block text-[10px] font-medium leading-none">
                   {label}
                 </span>
               </button>
