@@ -5,6 +5,7 @@ import { ROLES } from './constants/roles'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 
+const Landing        = lazy(() => import('./pages/Landing'))
 const Login          = lazy(() => import('./pages/Login'))
 const Dashboard      = lazy(() => import('./features/sst/pages/Dashboard'))
 const Chat           = lazy(() => import('./pages/Chat'))
@@ -35,8 +36,6 @@ function PrivateRoute({ children, roles }) {
 }
 
 export default function App() {
-  const { user } = useAuth()
-  const userRole = user?.role?.toString?.().toLowerCase?.()
 
   return (
     <Suspense fallback={
@@ -48,20 +47,11 @@ export default function App() {
     <ErrorBoundary>
     <Routes>
       {/* ── Rutas públicas (sin Layout, accesibles sin sesión) ── */}
+      <Route path="/"                element={<Landing />} />
       <Route path="/login"           element={<Login />} />
       <Route path="/reset-password"  element={<ResetPassword />} />
       <Route path="/cambiar-password" element={<CambiarPassword />} />
       <Route path="/mantenimiento"   element={<Mantenimiento />} />
-
-      {/* ── Redirección raíz según rol ── */}
-      <Route path="/" element={
-        <PrivateRoute>
-          {userRole === ROLES.SST      ? <Navigate to="/dashboard" replace /> :
-           userRole === ROLES.GERENCIA ? <Navigate to="/dashboard" replace /> :
-           userRole === ROLES.EMPLEADO ? <Navigate to="/empleado/chat" replace /> :
-           <Navigate to="/login" replace />}
-        </PrivateRoute>
-      }/>
 
       {/* ── Páginas protegidas (todas dentro del Layout) ── */}
       <Route element={<Layout />}>
