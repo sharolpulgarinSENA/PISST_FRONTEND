@@ -283,6 +283,9 @@ function PanelAsistencia({ sesion, capacitacion, theme }) {
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate" style={{ color: text }}>{emp.nombre}</p>
                 <p className="text-xs truncate" style={{ color: sub }}>{emp.cargo_nombre ?? 'Sin cargo'} · {emp.area_nombre ?? 'Sin área'}</p>
+                {!estadoActual && (
+                  <span className="text-xs font-medium" style={{ color: sub }}>Sin registrar</span>
+                )}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 {ESTADOS.map(e => {
