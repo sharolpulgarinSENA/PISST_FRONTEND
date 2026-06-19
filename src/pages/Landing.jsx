@@ -33,6 +33,44 @@ import concasco from '../assets/imagenes/concasco-removebg-preview.png'
 import sincasco from '../assets/imagenes/sincasco-removebg-preview.png'
 import logoChat from '../assets/imagenes/logo_chat.png'
 
+function interpolateStops(local, stops) {
+  for (let i = 0; i < stops.length - 1; i++) {
+    const a = stops[i], b = stops[i + 1]
+    if (local >= a.at && local <= b.at) {
+      const t = (local - a.at) / (b.at - a.at)
+      return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+        opacity: a.opacity + (b.opacity - a.opacity) * t,
+      }
+    }
+  }
+  return stops[stops.length - 1]
+}
+
+function getMascotState(progress, start, end, stops) {
+  if (progress <= start) return stops[0]
+  if (progress >= end) return stops[stops.length - 1]
+  const local = (progress - start) / (end - start)
+  return interpolateStops(local, stops)
+}
+
+const RIGHT_MASCOT_STOPS = [
+  { at: 0,    x: 130,  y: 0,   opacity: 0 },
+  { at: 0.12, x: 0,    y: 0,   opacity: 1 },
+  { at: 0.35, x: 0,    y: -70, opacity: 1 },
+  { at: 0.65, x: -220, y: -30, opacity: 1 },
+  { at: 1,    x: 130,  y: 0,   opacity: 0 },
+]
+
+const LEFT_MASCOT_STOPS = [
+  { at: 0,    x: -130, y: 0,   opacity: 0 },
+  { at: 0.12, x: 0,    y: 0,   opacity: 1 },
+  { at: 0.35, x: 0,    y: -70, opacity: 1 },
+  { at: 0.65, x: 220,  y: -30, opacity: 1 },
+  { at: 1,    x: -130, y: 0,   opacity: 0 },
+]
+
 const fadeInUp = {
   hidden: { opacity: 0, y: 40 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
@@ -309,20 +347,20 @@ function BenefitCard({ icon: Icon, title, desc, tag, tagColor, featured }) {
 export default function Landing() {
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [mascotProgress, setMascotProgress] = useState(0)
+  const [scrollProgress, setScrollProgress] = useState(0)
 
   useEffect(() => {
     const handleScroll = () => {
-      const section = document.getElementById('mascota-section')
-      if (!section) return
-      const rect = section.getBoundingClientRect()
-      const progress = 1 - rect.bottom / (rect.height + window.innerHeight)
-      setMascotProgress(Math.max(0, Math.min(1, progress)))
+      const total = document.documentElement.scrollHeight - window.innerHeight
+      setScrollProgress(total > 0 ? window.scrollY / total : 0)
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  const rightMascot = getMascotState(scrollProgress, 0.06, 0.34, RIGHT_MASCOT_STOPS)
+  const leftMascot  = getMascotState(scrollProgress, 0.42, 0.70, LEFT_MASCOT_STOPS)
 
   const goToLogin = useCallback(() => navigate('/login'), [navigate])
 
@@ -336,11 +374,7 @@ export default function Landing() {
       {/* NAVBAR */}
       <nav
         className="fixed top-0 left-0 w-full z-50 h-20 flex items-center justify-between px-6 md:px-10"
-        style={{
-          background: 'rgba(5,7,13,0.7)',
-          backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}
+        style={{ background: 'transparent' }}
       >
         <img src={pisstLogo} alt="Logo de PISST" className="h-16 w-auto object-contain" />
 
@@ -363,7 +397,10 @@ export default function Landing() {
           <button
             onClick={goToLogin}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white"
-            style={{ background: 'linear-gradient(90deg, #2563FF 0%, #7C3AED 100%)' }}
+            style={{
+              background: 'linear-gradient(90deg, #2563FF 0%, #7C3AED 100%)',
+              boxShadow: '0 0 24px rgba(37,99,255,0.5)',
+            }}
           >
             INICIAR SESIÓN <ArrowRight size={16} />
           </button>
@@ -382,7 +419,7 @@ export default function Landing() {
       {mobileMenuOpen && (
         <div
           className="md:hidden fixed top-20 left-0 w-full z-40 flex flex-col px-6 py-4 gap-4"
-          style={{ background: 'rgba(5,7,13,0.95)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+          style={{ background: '#05070D' }}
         >
           {NAV_LINKS.map((link) => (
             <button
@@ -397,12 +434,34 @@ export default function Landing() {
           <button
             onClick={goToLogin}
             className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white mt-2"
-            style={{ background: 'linear-gradient(90deg, #2563FF 0%, #7C3AED 100%)' }}
+            style={{
+              background: 'linear-gradient(90deg, #2563FF 0%, #7C3AED 100%)',
+              boxShadow: '0 0 24px rgba(37,99,255,0.5)',
+            }}
           >
             INICIAR SESIÓN <ArrowRight size={16} />
           </button>
         </div>
       )}
+
+      {/* SASBOT — se asoma por los bordes mientras se hace scroll */}
+      <motion.div
+        className="fixed z-40 pointer-events-none w-[120px] h-[120px]"
+        style={{ top: '38%', right: 0 }}
+        animate={{ x: rightMascot.x, y: rightMascot.y, opacity: rightMascot.opacity }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+      >
+        <img src={sincasco} alt="SASBOT sin casco asomándose" className="w-full h-full object-contain" />
+      </motion.div>
+
+      <motion.div
+        className="fixed z-40 pointer-events-none w-[120px] h-[120px]"
+        style={{ top: '58%', left: 0 }}
+        animate={{ x: leftMascot.x, y: leftMascot.y, opacity: leftMascot.opacity }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+      >
+        <img src={concasco} alt="SASBOT con casco asomándose" className="w-full h-full object-contain" />
+      </motion.div>
 
       {/* HERO */}
       <section id="hero" className="relative h-screen overflow-hidden">
@@ -461,38 +520,30 @@ export default function Landing() {
           >
             Digitaliza tu SG-SST. Cumple el Decreto 1072/2015 sin carpetas, sin Excel y sin estrés.
           </motion.p>
-        </div>
-      </section>
 
-      {/* MASCOTA */}
-      <section id="mascota-section" className="py-24 flex flex-col items-center justify-center" style={{ background: '#05070D' }}>
-        <div className="relative w-[120px] h-[120px] md:w-[180px] md:h-[180px]">
-          <motion.img
-            src={concasco}
-            alt="SASBOT con casco de seguridad amarillo"
-            animate={{ opacity: mascotProgress < 0.5 ? 1 : 0 }}
-            transition={{ duration: 0.4, ease: 'easeInOut' }}
-            className="absolute inset-0 w-full h-full object-contain"
-          />
-          <motion.img
-            src={sincasco}
-            alt="SASBOT sin casco de seguridad"
-            animate={{ opacity: mascotProgress >= 0.5 ? 1 : 0 }}
-            transition={{ duration: 0.4, ease: 'easeInOut' }}
-            className="absolute inset-0 w-full h-full object-contain"
-          />
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
+            onClick={goToLogin}
+            className="flex items-center gap-2 px-8 py-3 rounded-lg font-semibold text-white mt-8"
+            style={{
+              background: 'linear-gradient(90deg, #2563FF 0%, #7C3AED 100%)',
+              boxShadow: '0 0 30px rgba(37,99,255,0.45)',
+            }}
+          >
+            INICIAR SESIÓN <ArrowRight size={18} />
+          </motion.button>
+
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+            className="mt-10"
+            style={{ color: 'rgba(255,255,255,0.4)' }}
+          >
+            <ChevronDown size={22} />
+          </motion.div>
         </div>
-        <p className="hidden md:block text-sm mt-6" style={{ color: '#94A3B8', fontFamily: 'Inter, sans-serif' }}>
-          SASBOT — Tu asistente de SST con IA
-        </p>
-        <motion.div
-          animate={{ y: [0, 8, 0] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-          className="mt-6"
-          style={{ color: '#94A3B8' }}
-        >
-          <ChevronDown size={22} />
-        </motion.div>
       </section>
 
       {/* PROBLEMA */}
@@ -812,7 +863,7 @@ export default function Landing() {
 
         <div className="max-w-6xl mx-auto mt-12 pt-6 text-center" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
           <p className="text-xs" style={{ color: '#374151', fontFamily: 'Inter, sans-serif' }}>
-            © 2024 PISST. Todos los derechos reservados.
+            © 2026 PISST. Todos los derechos reservados.
           </p>
         </div>
       </footer>

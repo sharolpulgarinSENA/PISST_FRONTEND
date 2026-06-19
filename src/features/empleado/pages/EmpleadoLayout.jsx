@@ -240,8 +240,11 @@ export default function EmpleadoLayout() {
           .empleado-perfil-layout { flex-direction: column !important; }
           .empleado-perfil-tabs { width: 100% !important; flex-direction: row !important; overflow-x: auto; }
         }
+        @media (max-width: 640px) {
+          .empleado-chat-floating-chip { display: none; }
+        }
         @media (max-height: 480px) {
-          .empleado-chat-suggestions, .empleado-chat-disclaimer { display: none; }
+          .empleado-chat-floating-chip { display: none; }
         }
         @keyframes slideInLeft {
           from { transform: translateX(-100%); }
