@@ -241,10 +241,6 @@ export default function EmpleadoChat() {
     e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'
   }
 
-  const gradientBg = dark
-    ? `radial-gradient(circle at 20% 10%, rgba(99,102,241,0.45), transparent 60%), radial-gradient(circle at 85% 85%, rgba(124,58,237,0.4), transparent 60%), radial-gradient(circle at 50% 50%, rgba(79,70,229,0.18), transparent 70%), ${tk.bg}`
-    : `radial-gradient(circle at 20% 10%, rgba(167,139,250,0.55), transparent 60%), radial-gradient(circle at 85% 85%, rgba(244,114,182,0.45), transparent 60%), radial-gradient(circle at 50% 50%, rgba(129,140,248,0.2), transparent 70%), ${tk.bg}`
-
   const inputPill = (
     <div style={{
       width: '100%', maxWidth: 640, margin: '0 auto',
@@ -311,7 +307,7 @@ export default function EmpleadoChat() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0,
-      position: 'relative', overflow: 'hidden', background: gradientBg, transition: 'background 0.2s'
+      position: 'relative', overflow: 'hidden'
     }}>
 
       {/* Top bar minimalista */}

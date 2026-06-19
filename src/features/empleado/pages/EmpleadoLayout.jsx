@@ -10,6 +10,7 @@ import {
 import pisstLogo from '../../../assets/imagenes/pisst_logo.png'
 import logoMini from '../../../assets/imagenes/sincasco-removebg-preview.png'
 import { notificacionesAPI } from '../../../services/api'
+import { getAppGradient } from '../../../utils/appGradient'
 
 const NOTIF_LABELS = {
   // incidente
@@ -705,7 +706,7 @@ export default function EmpleadoLayout() {
             flex: 1, overflow: 'auto', overflowX: 'hidden', minHeight: 0,
             scrollbarGutter: 'stable',
             display: 'flex', flexDirection: 'column',
-            backgroundColor: tk.bg, transition: 'background-color 0.2s'
+            background: getAppGradient(dark, tk.bg), transition: 'background 0.2s'
           }}>
             <Outlet />
           </main>

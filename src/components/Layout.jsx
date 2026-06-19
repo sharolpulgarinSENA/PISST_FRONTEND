@@ -8,6 +8,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
 import ErrorBoundary from './ErrorBoundary'
 import { ROLES } from '../constants/roles'
+import { getAppGradient } from '../utils/appGradient'
 
 const routeToNavSST = {
   '/dashboard':      'dashboard',
@@ -74,7 +75,10 @@ export default function Layout() {
           setDarkMode={setDarkMode}
           onMenuClick={() => setSidebarOpen(true)}
         />
-        <main className="flex-1 overflow-y-auto pb-16 lg:pb-0">
+        <main
+          className="flex-1 overflow-y-auto pb-16 lg:pb-0"
+          style={{ background: getAppGradient(darkMode, darkMode ? '#0B0F19' : '#F9FAFB') }}
+        >
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>
