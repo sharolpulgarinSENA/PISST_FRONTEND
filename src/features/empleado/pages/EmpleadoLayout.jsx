@@ -119,6 +119,7 @@ export default function EmpleadoLayout() {
   const tk      = dark ? T.dark : T.light
   const nombre  = user?.nombre || user?.email?.split('@')[0] || 'Empleado'
   const inicial = nombre[0]?.toUpperCase()
+  const mainBackground = location.pathname === '/empleado/perfil' ? tk.bg : getAppGradient(dark, tk.bg)
 
   const handleLogout = () => { logout(); navigate('/login') }
 
@@ -706,7 +707,7 @@ export default function EmpleadoLayout() {
             flex: 1, overflow: 'auto', overflowX: 'hidden', minHeight: 0,
             scrollbarGutter: 'stable',
             display: 'flex', flexDirection: 'column',
-            background: getAppGradient(dark, tk.bg), transition: 'background 0.2s'
+            background: mainBackground, transition: 'background 0.2s'
           }}>
             <Outlet />
           </main>

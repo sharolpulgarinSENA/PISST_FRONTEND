@@ -232,3 +232,13 @@ export const auditoriasAPI = {
   actualizarHallazgo: (hallazgoId, data) => api.patch(`/auditorias/hallazgos/${hallazgoId}`, data),
   eliminarHallazgo:   (hallazgoId)       => api.delete(`/auditorias/hallazgos/${hallazgoId}`),
 };
+
+// ─── Admin ────────────────────────────────────────────────────────────────────
+export const adminAPI = {
+  getEmpresas:   ()            => api.get("/admin/empresas"),
+  crearEmpresa:  (data)        => api.post("/admin/empresas", data),
+  crearSST:      (data)        => api.post("/admin/crear-sst", data),
+  crearGerencia: (data)        => api.post("/admin/crear-gerencia", data),
+  resetPassword: (usuarioId)   => api.post(`/admin/usuarios/${usuarioId}/reset-password`),
+  limpiarTokens: ()            => api.post("/admin/limpiar-tokens"),
+};

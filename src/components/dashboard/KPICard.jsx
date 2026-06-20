@@ -25,6 +25,7 @@ export default function KPICard({
         backgroundColor: darkMode ? '#111827' : '#FFFFFF',
         borderColor: urgent ? urgentColor : (darkMode ? '#1F2937' : '#E5E7EB'),
         borderTopWidth: urgent ? '3px' : '1px',
+        boxShadow: darkMode ? '0 8px 24px -4px rgba(255,255,255,0.08)' : '0 8px 24px -4px rgba(15,23,42,0.14)',
       }}
     >
       {/* ====== Header: icono + label ====== */}

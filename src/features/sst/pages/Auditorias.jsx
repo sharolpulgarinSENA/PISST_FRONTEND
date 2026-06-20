@@ -693,7 +693,6 @@ function ModalDetalle({ darkMode, auditoria, initialTab = 'info', onClose, onAct
 ══════════════════════════════════════════ */
 export default function Auditorias() {
   const { darkMode } = useTheme()
-  const bg     = darkMode ? '#0B0F19' : '#F9FAFB'
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
@@ -748,7 +747,7 @@ export default function Auditorias() {
   const { paginaItems: auditoriasPagina, pagina, totalPaginas, setPagina } = usePaginacion(auditoriasFiltradas)
 
   return (
-    <div className="min-h-full px-4 sm:px-6 lg:px-8 py-6" style={{ backgroundColor: bg }}>
+    <div className="min-h-full px-4 sm:px-6 lg:px-8 py-6" style={{ background: 'transparent' }}>
 
       {/* Encabezado */}
       <div className="flex items-center justify-between mb-6">
@@ -793,7 +792,10 @@ export default function Auditorias() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {auditoriasPagina.map(a => (
             <div key={a.id} className="rounded-xl p-5 flex flex-col gap-3"
-                 style={{ backgroundColor: card, border: `1px solid ${border}` }}>
+                 style={{
+                   backgroundColor: card, border: `1px solid ${border}`,
+                   boxShadow: darkMode ? '0 8px 24px -4px rgba(255,255,255,0.08)' : '0 8px 24px -4px rgba(15,23,42,0.14)',
+                 }}>
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-sm" style={{ color: text }}>
                   {fmtFecha(a.fecha_programada)}

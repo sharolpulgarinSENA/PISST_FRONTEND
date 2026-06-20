@@ -1202,7 +1202,6 @@ function ModalDetalle({ darkMode, capacitacion: capInicial, onClose, onActualiza
 ══════════════════════════════════════════ */
 export default function Capacitaciones() {
   const { darkMode } = useTheme()
-  const bg     = darkMode ? '#0B0F19' : '#F9FAFB'
   const card   = darkMode ? '#111827' : '#FFFFFF'
   const border = darkMode ? '#1F2937' : '#E5E7EB'
   const text   = darkMode ? '#F9FAFB' : '#111827'
@@ -1255,7 +1254,7 @@ export default function Capacitaciones() {
   const pct = cobertura?.porcentaje ?? 0
 
   return (
-    <div className="min-h-full px-4 sm:px-6 lg:px-8 py-6" style={{ backgroundColor: bg }}>
+    <div className="min-h-full px-4 sm:px-6 lg:px-8 py-6" style={{ background: 'transparent' }}>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: text }}>Capacitaciones</h1>
@@ -1324,7 +1323,10 @@ export default function Capacitaciones() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {listaPagina.map(c => (
             <div key={c.id} className="rounded-xl p-5 flex flex-col gap-3 transition"
-                 style={{ backgroundColor: card, border: `1px solid ${border}`, opacity: c.activo ? 1 : 0.65 }}>
+                 style={{
+                   backgroundColor: card, border: `1px solid ${border}`, opacity: c.activo ? 1 : 0.65,
+                   boxShadow: darkMode ? '0 8px 24px -4px rgba(255,255,255,0.08)' : '0 8px 24px -4px rgba(15,23,42,0.14)',
+                 }}>
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-sm leading-snug" style={{ color: text }}>{c.titulo}</p>
                 <span className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"

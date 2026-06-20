@@ -25,6 +25,10 @@ const EmpleadoReporte        = lazy(() => import('./features/empleado/pages/Empl
 const EmpleadoPerfil         = lazy(() => import('./features/empleado/pages/EmpleadoPerfil'))
 const EmpleadoCapacitaciones = lazy(() => import('./features/empleado/pages/EmpleadoCapacitaciones'))
 
+const AdminLayout    = lazy(() => import('./features/admin/pages/AdminLayout'))
+const AdminEmpresas  = lazy(() => import('./features/admin/pages/AdminEmpresas'))
+const AdminUsuarios  = lazy(() => import('./features/admin/pages/AdminUsuarios'))
+
 function PrivateRoute({ children, roles }) {
   const { token, user } = useAuth()
   if (!token) return <Navigate to="/login" replace />
@@ -72,6 +76,13 @@ export default function App() {
         <Route path="reporte"       element={<EmpleadoReporte />} />
         <Route path="perfil"        element={<EmpleadoPerfil />} />
         <Route path="capacitaciones" element={<EmpleadoCapacitaciones />} />
+      </Route>
+
+      {/* ── Páginas del rol admin (layout propio) ── */}
+      <Route path="/admin" element={<PrivateRoute roles={[ROLES.ADMIN]}><AdminLayout /></PrivateRoute>}>
+        <Route index           element={<Navigate to="empresas" replace />} />
+        <Route path="empresas" element={<AdminEmpresas />} />
+        <Route path="usuarios" element={<AdminUsuarios />} />
       </Route>
 
       {/* ── Catch-all ── */}

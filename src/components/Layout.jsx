@@ -53,6 +53,8 @@ export default function Layout() {
   const navToRoute = esGerencia ? navToRouteGerencia : navToRouteSST
 
   const activeNav = routeToNav[location.pathname] || 'dashboard'
+  const baseColor = darkMode ? '#0B0F19' : '#F9FAFB'
+  const mainBackground = location.pathname === '/perfil' ? baseColor : getAppGradient(darkMode, baseColor)
 
   useEffect(() => {
     document.querySelector('main')?.scrollTo({ top: 0 })
@@ -77,7 +79,7 @@ export default function Layout() {
         />
         <main
           className="flex-1 overflow-y-auto pb-16 lg:pb-0"
-          style={{ background: getAppGradient(darkMode, darkMode ? '#0B0F19' : '#F9FAFB') }}
+          style={{ background: mainBackground }}
         >
           <ErrorBoundary>
             <Outlet />

@@ -99,7 +99,7 @@ export default function Dashboard() {
   if (error) return (
     <main
       className="flex-1 flex items-center justify-center px-4"
-      style={{ backgroundColor: darkMode ? '#0B0F19' : '#F9FAFB' }}
+      style={{ background: 'transparent' }}
     >
       <div className="text-center max-w-sm">
         <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
@@ -124,7 +124,7 @@ export default function Dashboard() {
   if (loading) return (
     <main
       className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-8"
-      style={{ backgroundColor: darkMode ? '#0B0F19' : '#F9FAFB' }}
+      style={{ background: 'transparent' }}
     >
       {selectorPeriodo}
 
@@ -292,7 +292,7 @@ export default function Dashboard() {
   return (
     <main
       className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-8"
-      style={{ backgroundColor: darkMode ? '#0B0F19' : '#F9FAFB' }}
+      style={{ background: 'transparent' }}
     >
       {selectorPeriodo}
 
@@ -304,7 +304,10 @@ export default function Dashboard() {
 
       {/* Score SG-SST destacado */}
       <div className="rounded-2xl p-5 mb-4 border flex items-center gap-5"
-           style={{ backgroundColor: darkMode ? '#111827' : '#FFFFFF', borderColor: darkMode ? '#1F2937' : '#E5E7EB' }}>
+           style={{
+             backgroundColor: darkMode ? '#111827' : '#FFFFFF', borderColor: darkMode ? '#1F2937' : '#E5E7EB',
+             boxShadow: darkMode ? '0 8px 24px -4px rgba(255,255,255,0.08)' : '0 8px 24px -4px rgba(15,23,42,0.14)',
+           }}>
         <div className="w-16 h-16 rounded-full flex items-center justify-center shrink-0"
              style={{ background: 'linear-gradient(135deg,#4F46E5,#7C3AED)', boxShadow: '0 0 24px rgba(99,102,241,0.35)' }}>
           <ShieldCheck size={28} color="#fff" />
