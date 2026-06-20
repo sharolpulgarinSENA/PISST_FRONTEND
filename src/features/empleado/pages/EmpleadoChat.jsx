@@ -243,9 +243,9 @@ export default function EmpleadoChat() {
 
   const inputPill = (
     <div style={{
-      width: '100%', maxWidth: 640, margin: '0 auto',
+      width: '100%', maxWidth: 720, margin: '0 auto',
       backgroundColor: tk.card, border: `1px solid ${tk.border}`,
-      borderRadius: 18, overflow: 'hidden',
+      borderRadius: 28, overflow: 'hidden',
       boxShadow: dark ? '0 12px 30px rgba(0,0,0,0.35)' : '0 12px 30px rgba(15,23,42,0.08)'
     }}>
       <textarea
@@ -255,26 +255,26 @@ export default function EmpleadoChat() {
         onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send())}
         placeholder={PLACEHOLDERS[placeholderIdx]}
         style={{
-          width: '100%', padding: '14px 16px', border: 'none',
+          width: '100%', padding: '16px 22px', border: 'none',
           backgroundColor: 'transparent', color: tk.text,
           fontSize: 14, resize: 'none', outline: 'none',
-          height: 44, maxHeight: 140, fontFamily: 'inherit',
+          height: 48, maxHeight: 140, fontFamily: 'inherit',
           lineHeight: 1.5, boxSizing: 'border-box'
         }}
       />
       {archivoError && (
-        <div style={{ padding: '0 12px 8px', fontSize: 12, color: '#EF4444' }}>{archivoError}</div>
+        <div style={{ padding: '0 18px 8px', fontSize: 12, color: '#EF4444' }}>{archivoError}</div>
       )}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 12px', borderTop: `1px solid ${tk.border}`
+        padding: '10px 16px', borderTop: `1px solid ${tk.border}`
       }}>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={typing}
           style={{
             display: 'flex', alignItems: 'center', gap: 5,
-            padding: '5px 10px', borderRadius: 7, border: `1px solid ${tk.border}`,
+            padding: '5px 10px', borderRadius: 999, border: `1px solid ${tk.border}`,
             backgroundColor: tk.sidebar, color: tk.textFaint, fontSize: 12,
             cursor: typing ? 'not-allowed' : 'pointer', opacity: typing ? 0.6 : 1
           }}>
@@ -291,7 +291,7 @@ export default function EmpleadoChat() {
           onClick={() => send()}
           disabled={!input.trim() || typing}
           style={{
-            width: 38, height: 38, borderRadius: 10, border: 'none', flexShrink: 0,
+            width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
             background: input.trim() && !typing ? 'linear-gradient(135deg,#4F46E5,#7C3AED)' : tk.border,
             color: input.trim() && !typing ? '#fff' : tk.textFaint,
             cursor: input.trim() && !typing ? 'pointer' : 'not-allowed',
@@ -381,7 +381,7 @@ export default function EmpleadoChat() {
               {GREETING.text}
             </p>
           </div>
-          <div style={{ width: '100%', maxWidth: 640 }}>
+          <div style={{ width: '100%', maxWidth: 720 }}>
             {inputPill}
           </div>
         </div>
@@ -392,7 +392,7 @@ export default function EmpleadoChat() {
             flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 24px',
             display: 'flex', flexDirection: 'column', gap: 16
           }}>
-            <div style={{ width: '100%', maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
               {messages.map(msg => msg.type === 'divider' ? (
                 <div key={msg.id} style={{
                   display: 'flex', alignItems: 'center', gap: 10,
@@ -410,14 +410,14 @@ export default function EmpleadoChat() {
                 }}>
                   {msg.from === 'bot' && <SasbotAvatar size={34} />}
                   <div style={{
-                    maxWidth: '80%', display: 'flex', flexDirection: 'column',
+                    maxWidth: '88%', display: 'flex', flexDirection: 'column',
                     alignItems: msg.from === 'user' ? 'flex-end' : 'flex-start'
                   }}>
                     {msg.from === 'bot' && (
                       <span style={{ fontSize: 12, fontWeight: 600, color: '#818CF8', marginBottom: 4 }}>SASBOT</span>
                     )}
                     <div style={{
-                      padding: '10px 14px',
+                      padding: '12px 20px',
                       borderRadius: msg.from === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px',
                       backgroundColor: msg.emergencia
                         ? 'rgba(239,68,68,0.1)'
@@ -461,9 +461,10 @@ export default function EmpleadoChat() {
                   <div>
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#818CF8', display: 'block', marginBottom: 4 }}>SASBOT</span>
                     <div style={{
-                      padding: '10px 14px', borderRadius: '4px 14px 14px 14px',
+                      padding: '12px 22px', borderRadius: '4px 14px 14px 14px',
                       backgroundColor: tk.card, border: `1px solid ${tk.border}`,
-                      display: 'flex', alignItems: 'center', gap: 6
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      minWidth: 120
                     }}>
                       <span style={{ fontSize: 13, color: tk.textFaint }}>Escribiendo</span>
                       <TypingDots />

@@ -78,7 +78,7 @@ export default function CambiarPassword() {
       if (role === ROLES.SST || role === ROLES.GERENCIA) navigate("/dashboard", { replace: true });
       else if (role === ROLES.EMPLEADO) navigate("/empleado/chat", { replace: true });
       else if (role === ROLES.ADMIN) navigate("/admin", { replace: true });
-      else navigate("/chat", { replace: true });
+      else navigate("/login", { replace: true });
     }
   }, [user, navigate]);
 
@@ -128,7 +128,8 @@ export default function CambiarPassword() {
       const role    = user?.role;
       const destino = role === ROLES.SST || role === ROLES.GERENCIA ? "/dashboard"
         : role === ROLES.ADMIN ? "/admin"
-        : "/chat";
+        : role === ROLES.EMPLEADO ? "/empleado/chat"
+        : "/login";
       setTimeout(() => navigate(destino), 1200);
     } catch (err) {
       setError(getErrorMessage(err, "Error al cambiar la contraseña. Inténtalo de nuevo."));

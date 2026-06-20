@@ -48,7 +48,7 @@ export default function Login() {
     if (normalizedRole === ROLES.SST || normalizedRole === ROLES.GERENCIA) navigate('/dashboard')
     else if (normalizedRole === ROLES.EMPLEADO) navigate('/empleado/chat')
     else if (normalizedRole === ROLES.ADMIN) navigate('/admin')
-    else navigate('/chat')
+    else navigate('/login')
   }, [login, updateUser, navigate])
 
   async function handleLogin() {

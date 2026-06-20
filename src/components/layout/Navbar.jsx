@@ -40,7 +40,6 @@ const ICONOS_EVENTO = {
 
 const SEARCH_DESTINOS = [
   { label: 'Dashboard',      path: '/dashboard',      roles: ['sst', 'gerencia'], keywords: 'inicio dashboard resumen' },
-  { label: 'SASBOT (Chat)',  path: '/chat',           roles: ['sst', 'gerencia'], keywords: 'chat sasbot asistente ia' },
   { label: 'Reportes',       path: '/incidentes',     roles: ['sst', 'gerencia'], keywords: 'incidentes reportes accidentes' },
   { label: 'Capacitaciones', path: '/capacitaciones', roles: ['sst'],             keywords: 'capacitaciones formaciones cursos' },
   { label: 'Riesgos',        path: '/riesgos',        roles: ['sst'],             keywords: 'riesgos matriz peligros' },

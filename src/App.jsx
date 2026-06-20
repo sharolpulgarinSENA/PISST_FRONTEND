@@ -8,7 +8,6 @@ import ErrorBoundary from './components/ErrorBoundary'
 const Landing        = lazy(() => import('./pages/Landing'))
 const Login          = lazy(() => import('./pages/Login'))
 const Dashboard      = lazy(() => import('./features/sst/pages/Dashboard'))
-const Chat           = lazy(() => import('./pages/Chat'))
 const Incidentes     = lazy(() => import('./features/sst/pages/Incidentes'))
 const Capacitaciones = lazy(() => import('./features/sst/pages/Capacitaciones'))
 const Riesgos        = lazy(() => import('./features/sst/pages/Riesgos'))
@@ -60,7 +59,6 @@ export default function App() {
       {/* ── Páginas protegidas (todas dentro del Layout) ── */}
       <Route element={<Layout />}>
         <Route path="/dashboard"      element={<PrivateRoute roles={[ROLES.SST,ROLES.GERENCIA]}><Dashboard /></PrivateRoute>} />
-        <Route path="/chat"           element={<PrivateRoute roles={[ROLES.SST,ROLES.GERENCIA]}><Chat /></PrivateRoute>} />
         <Route path="/incidentes"     element={<PrivateRoute roles={[ROLES.SST,ROLES.GERENCIA]}><Incidentes /></PrivateRoute>} />
         <Route path="/capacitaciones" element={<PrivateRoute roles={[ROLES.SST]}><Capacitaciones /></PrivateRoute>} />
         <Route path="/riesgos"        element={<PrivateRoute roles={[ROLES.SST]}><Riesgos /></PrivateRoute>} />
