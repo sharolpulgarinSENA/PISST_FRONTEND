@@ -483,7 +483,7 @@ export default function Landing() {
           <HeroChip key={i} {...chip} />
         ))}
 
-        <div className="relative z-10 h-full flex flex-col items-center justify-end text-center px-6 pb-24">
+        <div className="relative z-10 h-full flex flex-col items-center justify-end text-center px-4 sm:px-6 pb-24">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -498,7 +498,7 @@ export default function Landing() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="text-4xl md:text-6xl lg:text-7xl font-bold leading-tight"
+            className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold leading-tight"
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
             <span className="block">La plataforma que</span>
