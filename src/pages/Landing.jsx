@@ -52,6 +52,8 @@ const NAV_LINKS = [
   { label: 'SOLUCIÓN', href: '#solucion' },
   { label: 'SASBOT', href: '#sasbot' },
   { label: 'MÓDULOS', href: '#modulos' },
+  { label: 'BENEFICIARIOS', href: '#beneficiarios' },
+  { label: 'VIABILIDAD', href: '#viabilidad' },
 ]
 
 const fadeInUp = {
@@ -666,7 +668,7 @@ export default function Landing() {
       </section>
 
       {/* SECCIÓN 6 — BENEFICIARIOS */}
-      <section className="py-24 px-6 md:px-12" style={{ background: '#0A1020' }}>
+      <section id="beneficiarios" className="py-24 px-6 md:px-12" style={{ background: '#0A1020' }}>
         <motion.h2
           initial="hidden"
           whileInView="visible"
@@ -686,7 +688,7 @@ export default function Landing() {
       </section>
 
       {/* SECCIÓN 7 — VIABILIDAD TÉCNICA */}
-      <section className="py-24 px-6 md:px-12" style={{ background: '#0A1020' }}>
+      <section id="viabilidad" className="py-24 px-6 md:px-12" style={{ background: '#0A1020' }}>
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-12">
           <motion.div
             initial="hidden"
