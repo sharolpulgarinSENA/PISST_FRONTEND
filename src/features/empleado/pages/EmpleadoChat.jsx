@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { chatAPI, getErrorMessage } from '../../../services/api'
 import logoChatImg from '../../../assets/imagenes/logo_chat.png'
+import MarkdownMessage from '../../../components/chat/MarkdownMessage'
 
 const ARCHIVO_MAX_BYTES = 10 * 1024 * 1024
 
@@ -442,7 +443,7 @@ export default function EmpleadoChat() {
                           <AlertTriangle size={12} /> MODO EMERGENCIA — Llama al 123
                         </div>
                       )}
-                      {msg.text}
+                      <MarkdownMessage text={msg.text} />
                     </div>
                     <span style={{
                       fontSize: 11, color: tk.textFaint, marginTop: 4,

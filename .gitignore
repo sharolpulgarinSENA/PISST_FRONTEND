@@ -24,3 +24,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Notas personales, no van al repo
+NOTAS_CONCEPTOS_SST.md

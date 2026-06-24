@@ -5,6 +5,7 @@ import {
 import casco from '../../assets/imagenes/concasco-removebg-preview.png'
 import { chatAPI, getErrorMessage } from '../../services/api'
 import { normFecha } from '../../utils/dates'
+import MarkdownMessage from './MarkdownMessage'
 
 const HISTORIAL_LIMITE = 20
 const ARCHIVO_MAX_BYTES = 10 * 1024 * 1024
@@ -44,7 +45,7 @@ function MensajeBurbuja({ rol, texto, hora, emergencia, error, cargando, theme }
       >
         {cargando
           ? <Loader2 size={14} className="animate-spin" style={{ color: darkMode ? '#CBD5E1' : '#6B7280' }} />
-          : texto}
+          : <MarkdownMessage text={texto} />}
         {hora && !cargando && (
           <p className="text-[10px] mt-1 opacity-60">{fmtHora(hora)}</p>
         )}
