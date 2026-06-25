@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense, Fragment } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -10,13 +10,10 @@ import {
   X,
   ChevronDown,
   Sparkles,
-  Coins,
   AlertTriangle,
   FolderX,
   Banknote,
-  MessageCircle,
-  ClipboardList,
-  Scale,
+  Clock,
   BookOpen,
   Search,
   ShieldAlert,
@@ -29,6 +26,12 @@ import {
   Users,
   LifeBuoy,
   ClipboardCheck,
+  CheckCircle2,
+  XCircle,
+  Monitor,
+  Route,
+  Cpu,
+  Database,
 } from 'lucide-react'
 
 import pisstLogo from '../assets/imagenes/pisst_logo.png'
@@ -36,7 +39,6 @@ import fondoLanding2 from '../assets/imagenes/fondoLanding2.jpeg'
 import sincasco from '../assets/imagenes/sincasco-removebg-preview.png'
 import concasco from '../assets/imagenes/concasco-removebg-preview.png'
 import dashboardScreenshot from '../assets/imagenes/screenshots/dashboard-screenshot.png'
-import sasbotScreenshot from '../assets/imagenes/screenshots/sasbot-chat-screenshot.png'
 
 import DashboardMockup from '../components/landing/DashboardMockup'
 import ModuleCard from '../components/landing/ModuleCard'
@@ -49,10 +51,12 @@ const InteractiveBubble = lazy(() => import('../components/landing/InteractiveBu
 const NAV_LINKS = [
   { label: 'INICIO', href: '#hero' },
   { label: 'PROBLEMA', href: '#problema' },
-  { label: 'SOLUCIÓN', href: '#solucion' },
-  { label: 'SASBOT', href: '#sasbot' },
-  { label: 'MÓDULOS', href: '#modulos' },
   { label: 'BENEFICIARIOS', href: '#beneficiarios' },
+  { label: 'ALCANCE', href: '#alcance' },
+  { label: 'SOLUCIÓN', href: '#solucion' },
+  { label: 'CALIDAD', href: '#calidad' },
+  { label: 'ARQUITECTURA', href: '#arquitectura' },
+  { label: 'MÓDULOS', href: '#modulos' },
   { label: 'VIABILIDAD', href: '#viabilidad' },
 ]
 
@@ -76,36 +80,29 @@ const HERO_CHIPS = [
 ]
 
 const PROBLEM_CHIPS = [
-  { icon: Coins, text: '+$500M en sanciones' },
-  { icon: AlertTriangle, text: '1 trabajador/día' },
   { icon: FolderX, text: 'Documentos perdidos' },
+  { icon: Clock, text: 'Plazos olvidados' },
 ]
 
 const SOLUTION_FEATURES = [
   {
-    text: 'Score SG-SST actualizado en tiempo real',
+    text: 'Reporte de incidente en menos de 1 minuto',
     style: { top: 0, left: 0, transform: 'translate(-38%, -70%)' },
     Arrow: ArrowDownRight,
     arrowPosition: 'end',
   },
   {
-    text: 'Reportes gestionados automáticamente',
+    text: 'Certificados en PDF generados automáticamente',
     style: { bottom: 0, left: 0, transform: 'translate(-38%, 70%)' },
     Arrow: ArrowUpRight,
     arrowPosition: 'end',
   },
   {
-    text: 'Los 4 roles de tu empresa, conectados a la vez',
+    text: 'Respuesta del sistema en menos de 3 segundos',
     style: { top: '42%', right: 0, transform: 'translate(48%, -50%)' },
     Arrow: ArrowLeft,
     arrowPosition: 'start',
   },
-]
-
-const SASBOT_CHIPS = [
-  { icon: MessageCircle, text: 'Lenguaje natural' },
-  { icon: ClipboardList, text: 'Guía de reportes' },
-  { icon: Scale, text: 'Normativa SST' },
 ]
 
 const MODULES = [
@@ -121,6 +118,35 @@ const BENEFICIARIES = [
   { icon: ShieldCheck, title: 'Encargado SST', badge: 'Gestión manual → Automatización total', color: '#3B82F6', featured: false, delay: 0.1 },
   { icon: BarChart3, title: 'Gerencia', badge: 'Dashboard en tiempo real', color: '#7C3AED', featured: true, delay: 0.3 },
   { icon: HardHat, title: 'Empleados', badge: 'Reporte inmediato', color: '#FBBF24', featured: false, delay: 0.1 },
+]
+
+const SCOPE_INCLUDED = [
+  'Gestión de incidentes con FURAT automático',
+  'Capacitaciones con certificados en PDF',
+  'Auditorías con seguimiento de no conformidades',
+  'Matrices de riesgo (metodología GTC-45)',
+  'Dashboard de indicadores en tiempo real',
+  'SASBOT: asistente de IA normativa',
+]
+
+const SCOPE_EXCLUDED = [
+  'Facturación electrónica',
+  'Gestión de nómina',
+  'Módulos administrativos generales de la empresa',
+]
+
+const ARCHITECTURE_NODES = [
+  { icon: Monitor, label: 'React', sublabel: 'Frontend' },
+  { icon: Route, label: 'FastAPI Routers', sublabel: 'Routers' },
+  { icon: Cpu, label: 'Services', sublabel: 'Reglas de negocio' },
+  { icon: Database, label: 'PostgreSQL', sublabel: 'Modelos / DB' },
+]
+
+const QUALITY_METRICS = [
+  { icon: Zap, value: '< 3 segundos', label: 'Tiempo de respuesta' },
+  { icon: ShieldCheck, value: 'Cifrado', label: 'Datos protegidos' },
+  { icon: Clock, value: '24/7', label: 'Disponibilidad' },
+  { icon: LifeBuoy, value: '99% uptime', label: 'Continuidad del servicio' },
 ]
 
 const VIABILITY_METRICS = [
@@ -217,6 +243,73 @@ function SolutionCallout({ text, style, Arrow, arrowPosition }) {
   )
 }
 
+function ScopeItem({ icon: Icon, text, color, muted }) {
+  return (
+    <motion.li
+      variants={fadeInUp}
+      className="flex items-start gap-3"
+      style={{ opacity: muted ? 0.7 : 1 }}
+    >
+      <Icon size={18} color={color} className="shrink-0 mt-0.5" />
+      <span className="text-sm md:text-base" style={{ color: muted ? '#94A3B8' : '#E2E8F0', fontFamily: 'Inter, sans-serif' }}>
+        {text}
+      </span>
+    </motion.li>
+  )
+}
+
+function ArchNode({ icon: Icon, label, sublabel }) {
+  return (
+    <motion.div
+      variants={fadeInUp}
+      className="flex flex-col items-center justify-center gap-2 rounded-2xl px-5 py-5 min-w-[140px] shrink-0"
+      style={{ background: '#121826', border: '1px solid #1e2a3a' }}
+    >
+      <Icon size={26} color="#A78BFA" />
+      <span className="text-sm font-bold text-center" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        {label}
+      </span>
+      <span className="text-xs text-center" style={{ color: '#94A3B8', fontFamily: 'Inter, sans-serif' }}>
+        {sublabel}
+      </span>
+    </motion.div>
+  )
+}
+
+function ArchArrow() {
+  return (
+    <motion.div
+      className="shrink-0"
+      animate={{ x: [0, 6, 0] }}
+      transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+    >
+      <ArrowRight size={24} color="#60A5FA" />
+    </motion.div>
+  )
+}
+
+function QualityCard({ icon: Icon, value, label, isMobile }) {
+  return (
+    <motion.div
+      variants={fadeInUp}
+      animate={isMobile ? undefined : { y: [0, -10, 0] }}
+      transition={isMobile ? undefined : { duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+      className="rounded-2xl p-4 md:p-5 text-left md:text-center flex items-center md:flex-col gap-3 md:gap-0 min-w-0 flex-1"
+      style={{ background: '#121826', border: '1px solid #1e2a3a' }}
+    >
+      <Icon size={24} className="shrink-0 md:mx-auto md:mb-2" color="#A78BFA" />
+      <div className="flex flex-col">
+        <span className="text-sm font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          {value}
+        </span>
+        <span className="text-xs" style={{ color: '#94A3B8', fontFamily: 'Inter, sans-serif' }}>
+          {label}
+        </span>
+      </div>
+    </motion.div>
+  )
+}
+
 export default function Landing() {
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -241,8 +334,8 @@ export default function Landing() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const rightMascot = getMascotState(scrollProgress, 0.06, 0.34, RIGHT_MASCOT_STOPS)
-  const leftMascot = getMascotState(scrollProgress, 0.42, 0.7, LEFT_MASCOT_STOPS)
+  const rightMascot = getMascotState(scrollProgress, 0.05, 0.31, RIGHT_MASCOT_STOPS)
+  const leftMascot = getMascotState(scrollProgress, 0.38, 0.64, LEFT_MASCOT_STOPS)
 
   const goToLogin = useCallback(() => navigate('/login'), [navigate])
 
@@ -431,10 +524,71 @@ export default function Landing() {
       </section>
 
       {/* SECCIÓN 2 — EL PROBLEMA */}
-      <section id="problema" className="py-24 px-6 md:px-12 relative overflow-hidden" style={{ background: '#0A1020' }}>
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-12 items-start">
-          <div className="flex-1 min-w-0">
+      <section id="problema" className="min-h-[70vh] py-24 px-6 md:px-12 relative overflow-hidden flex items-center" style={{ background: '#0A1020' }}>
+        <div className="max-w-3xl mx-auto text-center px-2">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-100px' }}
+            variants={fadeInUp}
+          >
             <motion.h2
+              animate={isMobile ? undefined : { y: [0, -10, 0] }}
+              transition={isMobile ? undefined : { duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              className="font-medium italic leading-[1.35]"
+              style={{
+                fontSize: 'clamp(1.6rem, 4vw, 2.75rem)',
+                fontFamily: "'Space Grotesk', sans-serif",
+                color: '#E2E8F0',
+              }}
+            >
+              <span style={{ color: '#3B82F6' }}>“</span>
+              En Colombia muere{' '}
+              <span style={{ color: '#EF4444' }}>un trabajador cada día</span>{' '}
+              por accidentes laborales que{' '}
+              <span style={{ color: '#FBBF24' }}>pudieron prevenirse</span>.
+              <span style={{ color: '#3B82F6' }}>”</span>
+            </motion.h2>
+          </motion.div>
+
+          <motion.p
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-100px' }}
+            variants={fadeInUp}
+            className="text-sm md:text-base max-w-md mx-auto mt-6"
+            style={{ color: '#94A3B8', fontFamily: 'Inter, sans-serif' }}
+          >
+            Ese no es un dato lejano — es el problema que PISST existe para resolver.
+          </motion.p>
+        </div>
+      </section>
+
+      {/* SECCIÓN 3 — BENEFICIARIOS */}
+      <section id="beneficiarios" className="py-24 px-6 md:px-12" style={{ background: '#05070D' }}>
+        <motion.h2
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-100px' }}
+          variants={fadeInUp}
+          className="text-4xl md:text-6xl font-bold text-center mb-16"
+          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+        >
+          Beneficiarios
+        </motion.h2>
+
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-6 items-center">
+          {BENEFICIARIES.map((b) => (
+            <BeneficiaryCard key={b.title} {...b} featured={isMobile ? false : b.featured} />
+          ))}
+        </div>
+      </section>
+
+      {/* SECCIÓN 4 — ALCANCE */}
+      <section id="alcance" className="py-24 px-6 md:px-12" style={{ background: '#0A1020' }}>
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-12 items-start mb-20">
+          <div className="flex-1 min-w-0">
+            <motion.h3
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: '-100px' }}
@@ -446,15 +600,13 @@ export default function Landing() {
               <br />
               Excel desactualizado.
               <br />
-              Accidentes que sí
-              <br />
               <span
                 className="bg-clip-text text-transparent"
                 style={{ backgroundImage: 'linear-gradient(90deg, #2563FF 0%, #7C3AED 100%)' }}
               >
-                pudieron evitarse.
+                Decisiones tomadas demasiado tarde.
               </span>
-            </motion.h2>
+            </motion.h3>
 
             <motion.p
               initial="hidden"
@@ -501,7 +653,7 @@ export default function Landing() {
           whileInView="visible"
           viewport={{ once: true, margin: '-100px' }}
           variants={fadeInUp}
-          className="-mx-6 md:-mx-12 mt-10 md:mt-8 py-6 md:py-7"
+          className="-mx-6 md:-mx-12 mb-16 py-6 md:py-7"
           style={{
             background: 'linear-gradient(90deg, rgba(251,191,36,0.1), rgba(239,68,68,0.1))',
             borderTop: '1px solid rgba(251,191,36,0.25)',
@@ -520,13 +672,70 @@ export default function Landing() {
               $<CountUpNumber end={500} duration={2} />M+
             </p>
             <p className="text-sm" style={{ color: '#94A3B8', fontFamily: 'Inter, sans-serif' }}>
-              en sanciones evitables al año
+              en sanciones evitables al año — por eso definimos un alcance claro
             </p>
           </div>
         </motion.div>
+
+        <motion.h2
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-100px' }}
+          variants={fadeInUp}
+          className="text-4xl md:text-6xl font-bold text-center mb-16"
+          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+        >
+          ¿Qué resuelve esta versión?
+        </motion.h2>
+
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-6 md:gap-10">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-100px' }}
+            variants={staggerContainer}
+            className="flex-1 rounded-2xl p-6 md:p-8"
+            style={{ background: '#121826', border: '1px solid #1e2a3a' }}
+          >
+            <motion.p
+              variants={fadeInUp}
+              className="text-sm font-bold uppercase tracking-wide mb-5"
+              style={{ color: '#22C55E', fontFamily: 'Inter, sans-serif' }}
+            >
+              ✅ Incluido en esta versión
+            </motion.p>
+            <ul className="flex flex-col gap-3">
+              {SCOPE_INCLUDED.map((text) => (
+                <ScopeItem key={text} icon={CheckCircle2} text={text} color="#22C55E" />
+              ))}
+            </ul>
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-100px' }}
+            variants={staggerContainer}
+            className="flex-1 rounded-2xl p-6 md:p-8"
+            style={{ background: '#121826', border: '1px solid #1e2a3a' }}
+          >
+            <motion.p
+              variants={fadeInUp}
+              className="text-sm font-bold uppercase tracking-wide mb-5"
+              style={{ color: '#EF4444', fontFamily: 'Inter, sans-serif' }}
+            >
+              🚫 Fuera de alcance (por ahora)
+            </motion.p>
+            <ul className="flex flex-col gap-3">
+              {SCOPE_EXCLUDED.map((text) => (
+                <ScopeItem key={text} icon={XCircle} text={text} color="#EF4444" muted />
+              ))}
+            </ul>
+          </motion.div>
+        </div>
       </section>
 
-      {/* SECCIÓN 3 — LA SOLUCIÓN */}
+      {/* SECCIÓN 5 — LA SOLUCIÓN */}
       <section id="solucion" className="min-h-screen py-24 px-6 md:px-12 flex items-center" style={{ background: '#05070D' }}>
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-12 items-center">
           <div className="relative flex-[1.5] w-full min-w-0">
@@ -560,9 +769,9 @@ export default function Landing() {
               className="text-3xl md:text-5xl font-bold mb-8"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
-              Todo tu SG-SST,
+              Reportar, programar, auditar
               <br />
-              en una sola pantalla.
+              — en segundos.
             </motion.h2>
 
             <motion.div variants={staggerContainer} className="md:hidden flex flex-col gap-3 mb-8">
@@ -579,68 +788,87 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* SECCIÓN 4 — SASBOT */}
-      <section id="sasbot" className="min-h-screen py-24 px-6 md:px-12 flex items-center" style={{ background: '#0A1020' }}>
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row-reverse gap-12 items-center">
-          <div className="flex-[1.5] w-full min-w-0">
-            <DashboardMockup
-              src={sasbotScreenshot}
-              alt="Conversación con SASBOT"
-              glowColor="rgba(124,58,237,0.2)"
-            />
-          </div>
+      {/* SECCIÓN 6 — REQUERIMIENTOS NO FUNCIONALES */}
+      <section id="calidad" className="py-24 px-6 md:px-12 text-center" style={{ background: '#0A1020' }}>
+        <motion.h2
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-100px' }}
+          variants={fadeInUp}
+          className="text-4xl md:text-6xl font-bold mb-4"
+          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+        >
+          Confiable, no solo funcional
+        </motion.h2>
 
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-100px' }}
-            variants={staggerContainer}
-            className="flex-1 w-full min-w-0"
-          >
-            <motion.p
-              variants={fadeInUp}
-              className="flex items-center gap-2 text-xs uppercase tracking-wide md:tracking-widest mb-4"
-              style={{ color: '#7C3AED' }}
-            >
-              <Sparkles size={14} /> SASBOT — IA NORMATIVA
-            </motion.p>
+        <motion.p
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-100px' }}
+          variants={fadeInUp}
+          className="max-w-xl mx-auto text-sm md:text-base mb-16"
+          style={{ color: '#94A3B8', fontFamily: 'Inter, sans-serif' }}
+        >
+          Un reporte de accidente no puede esperar a que el sistema esté disponible.
+        </motion.p>
 
-            <motion.h2
-              variants={fadeInUp}
-              className="text-3xl md:text-5xl font-bold mb-6"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-            >
-              Pregúntale lo que sea
-              <br />
-              sobre SST.
-            </motion.h2>
-
-            <motion.p variants={fadeInUp} className="text-sm md:text-base mb-8" style={{ color: '#94A3B8', fontFamily: 'Inter, sans-serif' }}>
-              Responde dudas normativas, guía reportes y está disponible para cualquier
-              empleado, sin entrenamiento previo.
-            </motion.p>
-
-            <motion.div variants={staggerContainer} className="flex flex-wrap gap-3">
-              {SASBOT_CHIPS.map((chip) => (
-                <motion.div
-                  key={chip.text}
-                  variants={fadeInUp}
-                  className="flex items-center gap-2 rounded-full px-4 py-2"
-                  style={{ background: '#121826', border: '1px solid #1e2a3a' }}
-                >
-                  <chip.icon size={16} color="#A78BFA" />
-                  <span className="text-xs" style={{ color: '#CBD5E1', fontFamily: 'Inter, sans-serif' }}>
-                    {chip.text}
-                  </span>
-                </motion.div>
-              ))}
-            </motion.div>
-          </motion.div>
-        </div>
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-100px' }}
+          variants={staggerContainer}
+          className="max-w-5xl mx-auto flex flex-col md:flex-row gap-4"
+        >
+          {QUALITY_METRICS.map((metric) => (
+            <QualityCard key={metric.label} {...metric} isMobile={isMobile} />
+          ))}
+        </motion.div>
       </section>
 
-      {/* SECCIÓN 5 — MÓDULOS */}
-      <section id="modulos" className="py-24 px-6 md:px-12 text-center" style={{ background: '#05070D' }}>
+      {/* SECCIÓN 7 — ARQUITECTURA */}
+      <section id="arquitectura" className="py-24 px-6 md:px-12" style={{ background: '#05070D' }}>
+        <motion.h2
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-100px' }}
+          variants={fadeInUp}
+          className="text-4xl md:text-6xl font-bold text-center mb-16"
+          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+        >
+          Por dentro: arquitectura por capas
+        </motion.h2>
+
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-100px' }}
+          variants={staggerContainer}
+          className="max-w-5xl mx-auto flex flex-row items-center justify-center gap-3 md:gap-5 overflow-x-auto pb-2"
+        >
+          {ARCHITECTURE_NODES.map((node, i) => (
+            <Fragment key={node.label}>
+              <ArchNode {...node} />
+              {i < ARCHITECTURE_NODES.length - 1 && <ArchArrow />}
+            </Fragment>
+          ))}
+        </motion.div>
+
+        <motion.p
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-100px' }}
+          variants={fadeInUp}
+          className="max-w-2xl mx-auto text-center text-sm md:text-base mt-12"
+          style={{ color: '#94A3B8', fontFamily: 'Inter, sans-serif' }}
+        >
+          Cada incidente queda vinculado al empleado que lo reporta y a las capacitaciones
+          asociadas a su rol, así el historial de seguridad de cada persona se construye solo,
+          sin captura manual de datos repetidos.
+        </motion.p>
+      </section>
+
+      {/* SECCIÓN 8 — MÓDULOS */}
+      <section id="modulos" className="py-24 px-6 md:px-12 text-center" style={{ background: '#0A1020' }}>
         <motion.h2
           initial="hidden"
           whileInView="visible"
@@ -667,28 +895,8 @@ export default function Landing() {
         </motion.div>
       </section>
 
-      {/* SECCIÓN 6 — BENEFICIARIOS */}
-      <section id="beneficiarios" className="py-24 px-6 md:px-12" style={{ background: '#0A1020' }}>
-        <motion.h2
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: '-100px' }}
-          variants={fadeInUp}
-          className="text-4xl md:text-6xl font-bold text-center mb-16"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-        >
-          Beneficiarios
-        </motion.h2>
-
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-6 items-center">
-          {BENEFICIARIES.map((b) => (
-            <BeneficiaryCard key={b.title} {...b} featured={isMobile ? false : b.featured} />
-          ))}
-        </div>
-      </section>
-
-      {/* SECCIÓN 7 — VIABILIDAD TÉCNICA */}
-      <section id="viabilidad" className="py-24 px-6 md:px-12" style={{ background: '#0A1020' }}>
+      {/* SECCIÓN 9 — VIABILIDAD TÉCNICA */}
+      <section id="viabilidad" className="py-24 px-6 md:px-12" style={{ background: '#05070D' }}>
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-12">
           <motion.div
             initial="hidden"
@@ -759,7 +967,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* SECCIÓN 8 — BURBUJA + CTA FINAL (fusionadas) */}
+      {/* SECCIÓN 10 — BURBUJA + CTA FINAL (fusionadas) */}
       <section
         className="relative min-h-[80vh] py-20 px-6 md:px-12 flex items-center overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #0A1020 0%, #1a0a3a 50%, #0A1020 100%)' }}
@@ -813,7 +1021,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* SECCIÓN 9 — FOOTER */}
+      {/* SECCIÓN 11 — FOOTER */}
       <footer className="py-12 px-8" style={{ background: '#030508', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <img src={pisstLogo} alt="Logo de PISST" className="w-28 h-28 object-contain" />
